@@ -149,7 +149,7 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 
 	// log stats every 5 mins
 	ts := tunnelStats{}
-	go logStats(&ts, logger)
+	go logStats(&ts, protoname, logger)
 
 	lastLoopTime := time.Unix(0, 0)
 
