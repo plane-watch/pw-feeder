@@ -108,7 +108,6 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 			logger.Err(err).Msg("tunnel terminated. could not connect to plane watch")
 			continue
 		}
-		defer pwc.Close()
 
 		// connect local end point
 		lc, err := connectToHost(protoname, localaddr)
@@ -116,7 +115,6 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 			logger.Err(err).Msg("tunnel terminated. could not connect to local host")
 			continue
 		}
-		defer lc.Close()
 
 		// tunnel data
 		wg := sync.WaitGroup{}
@@ -172,7 +170,6 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 			logger.Err(err).Msg("tunnel terminated. could not set up local listener")
 			continue
 		}
-		defer ll.Close()
 
 		// wait for local connection
 		lc, err := ll.Accept()
@@ -180,7 +177,6 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 			logger.Err(err).Msg("tunnel terminated. could not accept local connection")
 			continue
 		}
-		defer lc.Close()
 
 		// update logger context
 		logger := log.With().Str("listen", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Str("src", lc.LocalAddr().String()).Logger()
@@ -192,7 +188,6 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 			logger.Err(err).Msg("tunnel terminated. could not connect to plane watch")
 			continue
 		}
-		defer pwc.Close()
 
 		// tunnel data
 		wg := sync.WaitGroup{}
@@ -208,6 +203,10 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 		err = lc.Close()
 		if err != nil {
 			logger.Debug().AnErr("err", err).Msg("error closing local conn")
+		}
+		err = ll.Close()
+		if err != nil {
+			logger.Debug().AnErr("err", err).Msg("error closing local listener")
 		}
 		err = pwc.Close()
 		if err != nil {
