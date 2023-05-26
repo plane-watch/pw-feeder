@@ -116,6 +116,9 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 			continue
 		}
 
+		// update user
+		logger.Info().Msg("connection established")
+
 		// tunnel data
 		wg := sync.WaitGroup{}
 		wg.Add(1)
