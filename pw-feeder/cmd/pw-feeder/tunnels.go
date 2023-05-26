@@ -113,10 +113,85 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 		// connect local end point
 		lc, err := connectToHost(protoname, localaddr)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not connect to beast host")
+			logger.Err(err).Msg("tunnel terminated. could not connect to local host")
 			continue
 		}
 		defer lc.Close()
+
+		// tunnel data
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go dataMoverNettoTLS(lc, pwc, &ts, &wg)
+		wg.Add(1)
+		go dataMoverTLStoNet(pwc, lc, &ts, &wg)
+
+		// wait for goroutines to finish
+		wg.Wait()
+
+		// attempt to close connections
+		err = lc.Close()
+		if err != nil {
+			logger.Debug().AnErr("err", err).Msg("error closing local conn")
+		}
+		err = pwc.Close()
+		if err != nil {
+			logger.Debug().AnErr("err", err).Msg("error closing remote conn")
+		}
+
+		// let user know
+		logger.Warn().Msg("tunnel terminated")
+	}
+
+	whenDone()
+}
+
+func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, whenDone func()) {
+
+	logger := log.With().Str("listen", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Logger()
+
+	// log stats every 5 mins
+	ts := tunnelStats{}
+	go logStats(&ts, logger)
+
+	lastLoopTime := time.Unix(0, 0)
+
+	for {
+
+		// back off if looping too frequently
+		if !time.Now().After(lastLoopTime.Add(1 * time.Second)) {
+			logger.Debug().Msg("Sleeping for 1 seconds")
+			time.Sleep(time.Second * 1)
+		}
+		lastLoopTime = time.Now()
+
+		logger.Info().Msg("listening for incoming connections")
+
+		// set up local listener
+		ll, err := net.Listen("tcp", localaddr)
+		if err != nil {
+			logger.Err(err).Msg("tunnel terminated. could not set up local listener")
+			continue
+		}
+
+		// wait for local connection
+		lc, err := ll.Accept()
+		if err != nil {
+			logger.Err(err).Msg("tunnel terminated. could not accept local connection")
+			continue
+		}
+		defer lc.Close()
+
+		// update logger context
+		logger := log.With().Str("listen", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Str("src", lc.LocalAddr().String()).Logger()
+		logger.Info().Msg("connection established")
+
+		// connect plane.watch endpoint
+		pwc, err := stunnelConnect(protoname, pwendpoint, apikey)
+		if err != nil {
+			logger.Err(err).Msg("tunnel terminated. could not connect to plane watch")
+			continue
+		}
+		defer pwc.Close()
 
 		// tunnel data
 		wg := sync.WaitGroup{}

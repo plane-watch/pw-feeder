@@ -39,28 +39,28 @@ func main() {
 
 			&cli.StringFlag{
 				Name:    "mlatserverhost",
-				Usage:   "Host to connect to for MLAT server connection",
+				Usage:   "Listen host for MLAT server connection",
 				Value:   "127.0.0.1",
 				EnvVars: []string{"MLATSERVERHOST"},
 			},
 			&cli.UintFlag{
 				Name:    "mlatserverport",
-				Usage:   "Port to connect to for MLAT server connection",
-				Value:   30105,
+				Usage:   "Listen port for MLAT server connection",
+				Value:   12346,
 				EnvVars: []string{"MLATSERVERPORT"},
 			},
 			&cli.StringFlag{
 				Name:    "beastout",
 				Hidden:  true,
 				Usage:   "plane.watch endpoint for BEAST data",
-				Value:   "feed.push.plane.watch:22345",
+				Value:   "feed.push.plane.watch:12345",
 				EnvVars: []string{"PW_BEAST_ENDPOINT"},
 			},
 			&cli.StringFlag{
 				Name:    "mlatout",
 				Hidden:  true,
 				Usage:   "plane.watch endpoint for MLAT data",
-				Value:   "feed.push.plane.watch:22346",
+				Value:   "feed.push.plane.watch:12346",
 				EnvVars: []string{"PW_MLAT_ENDPOINT"},
 			},
 			&cli.BoolFlag{
@@ -108,7 +108,7 @@ func runFeeder(ctx *cli.Context) error {
 
 	// start MLAT tunnel
 	wg.Add(1)
-	go tunnelOutboundConnection(
+	go tunnelInboundConnection(
 		"MLAT",
 		fmt.Sprintf("%s:%s", ctx.String("mlatserverhost"), ctx.String("mlatserverport")),
 		ctx.String("mlatout"),
