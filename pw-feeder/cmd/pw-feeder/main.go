@@ -38,16 +38,16 @@ func main() {
 			},
 
 			&cli.StringFlag{
-				Name:    "mlatresultshost",
-				Usage:   "Host to connect to for MLAT results in BEAST format",
+				Name:    "mlatserverhost",
+				Usage:   "Host to connect to for MLAT server connection",
 				Value:   "127.0.0.1",
-				EnvVars: []string{"MLATRESULTSHOST"},
+				EnvVars: []string{"MLATSERVERHOST"},
 			},
 			&cli.UintFlag{
-				Name:    "mlatresultsport",
-				Usage:   "Port to connect to for MLAT results in BEAST format",
+				Name:    "mlatserverport",
+				Usage:   "Port to connect to for MLAT server connection",
 				Value:   30105,
-				EnvVars: []string{"MLATRESULTSPORT"},
+				EnvVars: []string{"MLATSERVERPORT"},
 			},
 			&cli.StringFlag{
 				Name:    "beastout",
@@ -110,7 +110,7 @@ func runFeeder(ctx *cli.Context) error {
 	wg.Add(1)
 	go tunnelOutboundConnection(
 		"MLAT",
-		fmt.Sprintf("%s:%s", ctx.String("mlatresultshost"), ctx.String("mlatresultsport")),
+		fmt.Sprintf("%s:%s", ctx.String("mlatserverhost"), ctx.String("mlatserverport")),
 		ctx.String("mlatout"),
 		ctx.String("apikey"),
 		wg.Done,
