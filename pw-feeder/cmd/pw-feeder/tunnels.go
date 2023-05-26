@@ -73,11 +73,11 @@ func dataMoverTLStoNet(connA *tls.Conn, connB net.Conn, ts *tunnelStats, wg *syn
 	wg.Done()
 }
 
-func logStats(ts *tunnelStats, logger zerolog.Logger) {
+func logStats(ts *tunnelStats, proto string, logger zerolog.Logger) {
 	for {
 		time.Sleep(300 * time.Second)
 		bytesRxLocal, bytesTxLocal, bytesRxRemote, bytesTxRemote := ts.readStats()
-		logger.Info().Uint64("bytesRxLocal", bytesRxLocal).Uint64("bytesTxLocal", bytesTxLocal).Uint64("bytesRxRemote", bytesRxRemote).Uint64("bytesTxRemote", bytesTxRemote).Str("proto", "BEAST").Msg("statistics")
+		logger.Info().Uint64("bytesRxLocal", bytesRxLocal).Uint64("bytesTxLocal", bytesTxLocal).Uint64("bytesRxRemote", bytesRxRemote).Uint64("bytesTxRemote", bytesTxRemote).Str("proto", proto).Msg("statistics")
 	}
 }
 
@@ -87,7 +87,7 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 
 	// log stats every 5 mins
 	ts := tunnelStats{}
-	go logStats(&ts, logger)
+	go logStats(&ts, protoname, logger)
 
 	lastLoopTime := time.Unix(0, 0)
 
