@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -56,6 +57,7 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				_, err = cert.Verify(vo)
 				if err != nil {
 					logger.Warn().AnErr("err", err).Caller().Msg("could not verify server cert")
+					fmt.Println(err)
 					// return err
 				}
 
