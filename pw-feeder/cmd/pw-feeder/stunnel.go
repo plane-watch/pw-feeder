@@ -51,6 +51,7 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				// verify server cert
 				vo := x509.VerifyOptions{}
 				vo.Roots = scp
+				vo.Intermediates = scp
 				_, err = cert.Verify(vo)
 				if err != nil {
 					logger.Err(err).Caller().Msg("could not verify server cert")
