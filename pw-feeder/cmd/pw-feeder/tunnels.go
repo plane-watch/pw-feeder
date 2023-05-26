@@ -181,7 +181,7 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 		}
 
 		// update logger context
-		logger := log.With().Str("listen", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Str("src", lc.LocalAddr().String()).Logger()
+		logger := log.With().Str("listen", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Str("src", lc.RemoteAddr().String()).Logger()
 		logger.Info().Msg("connection established")
 
 		// connect plane.watch endpoint
