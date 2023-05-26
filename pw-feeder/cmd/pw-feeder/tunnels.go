@@ -172,6 +172,7 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 			logger.Err(err).Msg("tunnel terminated. could not set up local listener")
 			continue
 		}
+		defer ll.Close()
 
 		// wait for local connection
 		lc, err := ll.Accept()
