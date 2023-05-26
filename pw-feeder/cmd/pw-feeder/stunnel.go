@@ -74,6 +74,13 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 		return nil
 	}
 
+	// load root CAs
+	scp, err := x509.SystemCertPool()
+	if err != nil {
+		logger.Err(err).Caller().Msg("could not use system cert pool")
+		return c, err
+	}
+
 	// set up tls config
 	tlsConfig := tls.Config{
 		RootCAs:               scp,
