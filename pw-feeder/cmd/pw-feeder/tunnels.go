@@ -87,6 +87,7 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 
 	// log stats every 5 mins
 	ts := tunnelStats{}
+	ts.mu = sync.RWMutex{}
 	go logStats(&ts, logger)
 
 	lastLoopTime := time.Unix(0, 0)
