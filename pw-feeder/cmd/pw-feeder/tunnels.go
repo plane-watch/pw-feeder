@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -73,11 +72,11 @@ func dataMoverTLStoNet(connA *tls.Conn, connB net.Conn, ts *tunnelStats, wg *syn
 	wg.Done()
 }
 
-func logStats(ts *tunnelStats, proto string, logger zerolog.Logger) {
+func logStats(ts *tunnelStats, proto string) {
 	for {
 		time.Sleep(300 * time.Second)
 		bytesRxLocal, bytesTxLocal, bytesRxRemote, bytesTxRemote := ts.readStats()
-		logger.Info().Uint64("bytesRxLocal", bytesRxLocal).Uint64("bytesTxLocal", bytesTxLocal).Uint64("bytesRxRemote", bytesRxRemote).Uint64("bytesTxRemote", bytesTxRemote).Str("proto", proto).Msg("statistics")
+		log.Info().Uint64("bytesRxLocal", bytesRxLocal).Uint64("bytesTxLocal", bytesTxLocal).Uint64("bytesRxRemote", bytesRxRemote).Uint64("bytesTxRemote", bytesTxRemote).Str("proto", proto).Msg("statistics")
 	}
 }
 
@@ -87,7 +86,7 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 
 	// log stats every 5 mins
 	ts := tunnelStats{}
-	go logStats(&ts, protoname, logger)
+	go logStats(&ts, protoname)
 
 	lastLoopTime := time.Unix(0, 0)
 
@@ -152,7 +151,7 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 
 	// log stats every 5 mins
 	ts := tunnelStats{}
-	go logStats(&ts, protoname, logger)
+	go logStats(&ts, protoname)
 
 	lastLoopTime := time.Unix(0, 0)
 
