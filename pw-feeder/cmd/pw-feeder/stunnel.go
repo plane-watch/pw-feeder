@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -18,13 +17,6 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 
 	// split host/port from addr
 	remoteHost := strings.Split(addr, ":")[0]
-
-	// load root CAs
-	scp, err := x509.SystemCertPool()
-	if err != nil {
-		logger.Err(err).Caller().Msg("could not use system cert pool")
-		return c, err
-	}
 
 	// define custom cert verification function
 	customVerify := func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
@@ -49,6 +41,13 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 					return err
 				}
 
+				// load root CAs
+				scp, err := x509.SystemCertPool()
+				if err != nil {
+					logger.Err(err).Caller().Msg("could not use system cert pool")
+					return err
+				}
+
 				// TODO: fix this
 				// verify server cert
 				vo := x509.VerifyOptions{}
@@ -58,7 +57,6 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				_, err = cert.Verify(vo)
 				if err != nil {
 					logger.Warn().AnErr("err", err).Caller().Msg("could not verify server cert")
-					fmt.Println(err)
 					// return err
 				}
 
