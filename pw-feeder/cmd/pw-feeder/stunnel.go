@@ -49,15 +49,15 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				}
 
 				// TODO: fix this
-				// // verify server cert
-				// vo := x509.VerifyOptions{}
-				// vo.Roots = scp
-				// vo.Intermediates = scp
-				// _, err = cert.Verify(vo)
-				// if err != nil {
-				// 	logger.Err(err).Caller().Msg("could not verify server cert")
-				// 	return err
-				// }
+				// verify server cert
+				vo := x509.VerifyOptions{}
+				vo.Roots = scp
+				vo.Intermediates = scp
+				_, err = cert.Verify(vo)
+				if err != nil {
+					logger.Warn().AnErr("err", err).Caller().Msg("could not verify server cert")
+					// return err
+				}
 
 				// check validity dates
 				if time.Now().Before(cert.NotBefore) {
