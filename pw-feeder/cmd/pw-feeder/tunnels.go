@@ -21,10 +21,10 @@ type tunnelStats struct {
 func (ts *tunnelStats) incrementByteCounter(bytesRxLocal, bytesTxLocal, bytesRxRemote, bytesTxRemote uint64) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	ts.bytesRxLocal += ts.bytesRxLocal
-	ts.bytesTxLocal += ts.bytesTxLocal
-	ts.bytesRxRemote += ts.bytesRxRemote
-	ts.bytesTxRemote += ts.bytesTxRemote
+	ts.bytesRxLocal += bytesRxLocal
+	ts.bytesTxLocal += bytesTxLocal
+	ts.bytesRxRemote += bytesRxRemote
+	ts.bytesTxRemote += bytesTxRemote
 }
 
 func (ts *tunnelStats) readStats() (bytesRxLocal, bytesTxLocal, bytesRxRemote, bytesTxRemote uint64) {
