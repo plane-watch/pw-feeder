@@ -111,7 +111,7 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 		// connect local end point
 		lc, err := connectToHost(protoname, localaddr)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running	and listening on the specified port")
+			logger.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running and listening on the specified port")
 			continue
 		}
 
