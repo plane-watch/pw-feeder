@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -96,13 +97,11 @@ func runFeeder(ctx *cli.Context) error {
 
 	apikey, err := uuid.Parse(ctx.String("apikey"))
 	if err != nil {
-		log.Err(err).Msg("The API Key provided isn't a valid UUID, please check the arguments or environment file in your docker-compose.yml and try again")
-		os.Exit(1)
+		return errors.New("The API Key provided isn't a valid UUID, please check the arguments or environment file in your docker-compose.yml and try again")
 	}
 
 	if apikey.String() == "00000000-0000-0000-0000-000000000000" {
-		log.Err(err).Msg("The API Key provided is the default API key in the documentation, please update the arguments or environment file in your docker-compose.yml and try again")
-		os.Exit(1)
+		return errors.New("The API Key provided is the default API key in the documentation, please update the arguments or environment file in your docker-compose.yml and try again")
 	}
 
 	wg := sync.WaitGroup{}
