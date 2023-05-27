@@ -177,7 +177,7 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 		// wait for local connection
 		lc, err := ll.Accept()
 		if err != nil {
-			logger.Err(err).Msg("An error occured attempting to handle the incoming connection")
+			logger.Err(err).Msg("An error occurred attempting to handle the incoming connection")
 			continue
 		}
 
