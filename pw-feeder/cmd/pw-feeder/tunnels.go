@@ -76,7 +76,7 @@ func logStats(ts *tunnelStats, proto string) {
 	for {
 		time.Sleep(300 * time.Second)
 		bytesRxLocal, bytesTxLocal, bytesRxRemote, bytesTxRemote := ts.readStats()
-		log.Info().Uint64("bytesRxLocal", bytesRxLocal).Uint64("bytesTxLocal", bytesTxLocal).Uint64("bytesRxRemote", bytesRxRemote).Uint64("bytesTxRemote", bytesTxRemote).Str("proto", proto).Msg("statistics")
+		log.Info().Uint64("bytesRxLocal", bytesRxLocal).Uint64("bytesTxLocal", bytesTxLocal).Uint64("bytesRxRemote", bytesRxRemote).Uint64("bytesTxRemote", bytesTxRemote).Str("proto", proto).Msg("Current Connection Statistics")
 	}
 }
 
@@ -99,26 +99,27 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 		}
 		lastLoopTime = time.Now()
 
-		logger.Info().Msg("starting tunnel")
+		logger.Info().Msg("initiating tunnel connection to plane.watch")
 
 		// connect plane.watch endpoint
 		pwc, err := stunnelConnect(protoname, pwendpoint, apikey)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not connect to plane watch")
+			logger.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection")
 			continue
 		}
 
 		// connect local end point
 		lc, err := connectToHost(protoname, localaddr)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not connect to local host")
+			logger.Err(err).Msg("tunnel terminated. could not connect to the local readsb instance, please ensure it is running	and listening on the specified port")
 			continue
 		}
 
 		// update user
-		logger.Info().Msg("connection established")
+		logger.Info().Msg("connection to plane.watch established")
 
-		// tunnel data
+		// start tunneling data
+		// This will block until there is an error or the connection is closed
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go dataMoverNettoTLS(lc, pwc, &ts, &wg)
@@ -131,15 +132,15 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 		// attempt to close connections
 		err = lc.Close()
 		if err != nil {
-			logger.Debug().AnErr("err", err).Msg("error closing local conn")
+			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the local readsb connection")
 		}
 		err = pwc.Close()
 		if err != nil {
-			logger.Debug().AnErr("err", err).Msg("error closing remote conn")
+			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the remote connection to plane.watch")
 		}
 
 		// let user know
-		logger.Warn().Msg("tunnel terminated")
+		logger.Warn().Msg("tunnel to plane.watch has been terminated, attempting to reconnect. if this message persists, please check your that your API key is valid before trying again")
 	}
 
 	whenDone()
@@ -164,30 +165,30 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 		}
 		lastLoopTime = time.Now()
 
-		logger.Info().Msg("listening for incoming connections")
+		logger.Info().Msg("starting listener service")
 
 		// set up local listener
 		ll, err := net.Listen("tcp", localaddr)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not set up local listener")
+			logger.Err(err).Msg("Could not bind to the requested tcp listening port, please check your configuration.")
 			continue
 		}
 
 		// wait for local connection
 		lc, err := ll.Accept()
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not accept local connection")
+			logger.Err(err).Msg("An error occured attempting to handle the incoming connection")
 			continue
 		}
 
 		// update logger context
 		logger := log.With().Str("listen", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Str("src", lc.RemoteAddr().String()).Logger()
-		logger.Info().Msg("connection established")
+		logger.Info().Msg("connection established to local readsb instance")
 
 		// connect plane.watch endpoint
 		pwc, err := stunnelConnect(protoname, pwendpoint, apikey)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not connect to plane watch")
+			logger.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection.")
 			continue
 		}
 
@@ -204,19 +205,19 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 		// attempt to close connections
 		err = lc.Close()
 		if err != nil {
-			logger.Debug().AnErr("err", err).Msg("error closing local conn")
+			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the local readsb connection")
 		}
 		err = ll.Close()
 		if err != nil {
-			logger.Debug().AnErr("err", err).Msg("error closing local listener")
+			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the local readsb listener")
 		}
 		err = pwc.Close()
 		if err != nil {
-			logger.Debug().AnErr("err", err).Msg("error closing remote conn")
+			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the remote connection to plane.watch")
 		}
 
 		// let user know
-		logger.Warn().Msg("tunnel terminated")
+		logger.Warn().Msg("tunnel to plane.watch has been terminated, attempting to reconnect. if this message persists, please check your that your API key is valid before trying again")
 	}
 
 	whenDone()
