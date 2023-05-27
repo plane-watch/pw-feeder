@@ -111,7 +111,7 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 		// connect local end point
 		lc, err := connectToHost(protoname, localaddr)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not connect to the local readsb instance, please ensure it is running	and listening on the specified port")
+			logger.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running	and listening on the specified port")
 			continue
 		}
 
@@ -132,7 +132,7 @@ func tunnelOutboundConnection(protoname, localaddr, pwendpoint, apikey string, w
 		// attempt to close connections
 		err = lc.Close()
 		if err != nil {
-			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the local readsb connection")
+			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the connection to the local data source")
 		}
 		err = pwc.Close()
 		if err != nil {
@@ -183,7 +183,7 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 
 		// update logger context
 		logger := log.With().Str("listen", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Str("src", lc.RemoteAddr().String()).Logger()
-		logger.Info().Msg("connection established to local readsb instance")
+		logger.Info().Msg("connection established to local data source")
 
 		// connect plane.watch endpoint
 		pwc, err := stunnelConnect(protoname, pwendpoint, apikey)
@@ -205,11 +205,11 @@ func tunnelInboundConnection(protoname, localaddr, pwendpoint, apikey string, wh
 		// attempt to close connections
 		err = lc.Close()
 		if err != nil {
-			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the local readsb connection")
+			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the local data source")
 		}
 		err = ll.Close()
 		if err != nil {
-			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the local readsb listener")
+			logger.Debug().AnErr("err", err).Msg("Internal Error when attempting to close the local listener")
 		}
 		err = pwc.Close()
 		if err != nil {
