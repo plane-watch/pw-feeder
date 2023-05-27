@@ -15,7 +15,7 @@ import (
 
 func main() {
 	app := &cli.App{
-		Version:     "20230526",
+		Version:     "20230527-angsty",
 		Name:        "pw-feeder",
 		Description: `Plane Watch Feeder Client`,
 		Flags: []cli.Flag{
