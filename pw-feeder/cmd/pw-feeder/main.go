@@ -76,7 +76,7 @@ func main() {
 	// configure logging
 	logConfig := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.UnixDate}
 	logConfig.FormatTimestamp = func(i interface{}) string {
-		return fmt.Sprintf("[%s] \x1b[%dm%v\x1b[0m", app.Name, 90, i)
+		return fmt.Sprintf("[%s] \x1b[%dm%v\x1b[0m", app.Name, 90, i) // 90 = Dark Gray colour
 	}
 	log.Logger = log.Output(logConfig)
 
@@ -99,6 +99,7 @@ func main() {
 func runFeeder(ctx *cli.Context) error {
 	log.Info().Str("version", ctx.App.Version).Msg("plane.watch feeder started")
 
+	// sanity checks on api key entered
 	apikey, err := uuid.Parse(ctx.String("apikey"))
 	if err != nil {
 		return errors.New("The API Key provided isn't a valid UUID, please check the arguments or environment file in your docker-compose.yml and try again")
