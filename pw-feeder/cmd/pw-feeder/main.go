@@ -74,7 +74,11 @@ func main() {
 	}
 
 	// configure logging
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+	logConfig := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.UnixDate}
+	logConfig.FormatTimestamp = func(i interface{}) string {
+		return fmt.Sprintf("[%s] \x1b[%dm%v\x1b[0m", app.Name, 90, i)
+	}
+	log.Logger = log.Output(logConfig)
 
 	// Set logging level
 	app.Before = func(c *cli.Context) error {
