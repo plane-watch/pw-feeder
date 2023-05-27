@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 
 func main() {
 	app := &cli.App{
-		Version:     "20230527-angsty",
 		Name:        "pw-feeder",
 		Description: `Plane Watch Feeder Client`,
 		Flags: []cli.Flag{
@@ -72,6 +72,19 @@ func main() {
 		},
 		Action: runFeeder,
 	}
+
+	// get version from git info
+	var commithash = func() string {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			for _, setting := range info.Settings {
+				if setting.Key == "vcs.revision" {
+					return setting.Value
+				}
+			}
+		}
+		return ""
+	}()
+	app.Version = commithash[:7]
 
 	// configure logging
 	logConfig := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.UnixDate}
