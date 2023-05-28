@@ -1,0 +1,38 @@
+---
+name: Pull Request
+
+on:
+  # Enable manual running of action if necessary
+  workflow_dispatch:
+  # Test build/deploy on PRs to main/master
+  pull_request:
+    # Only publish on push to main branch
+    branches:
+      - main
+    # Don't trigger if it's just a documentation update
+    paths-ignore:
+      - '**.md'
+      - '**.MD'
+      - '**.yml'
+      - '.gitattributes'
+      - '.gitignore'
+
+jobs:
+
+  tests:
+    name: Test pw-feeder
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: "go mod tidy"
+        run: |
+          cd pw-feeder
+          go mod tidy
+      - name: "go test"
+        run: |
+          cd pw-feeder
+          go test -v ./...
+      - name: "go build"
+        run: |
+          cd pw-feeder
+          go build ./...
