@@ -13,6 +13,7 @@ func TestConnectToHost(t *testing.T) {
 	// set up test listener
 	tl, err := nettest.NewLocalListener("tcp")
 	if err != nil {
+		t.Log("Error creating listener for testing")
 		t.Error(err)
 	}
 	assert.NoError(t, err)
