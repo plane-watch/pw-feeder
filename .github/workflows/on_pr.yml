@@ -24,10 +24,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: cd pw-feeder
       - name: "go mod tidy"
-        run: go mod tidy
+        run: |
+          cd pw-feeder
+          go mod tidy
       - name: "go test"
-        run: go test -v ./...
+        run: |
+          cd pw-feeder
+          go test -v ./...
       - name: "go build"
-        run: go build ./...
+        run: |
+          cd pw-feeder
+          go build ./...
