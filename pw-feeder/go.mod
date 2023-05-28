@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/rs/zerolog v1.29.1
 	github.com/stretchr/testify v1.8.3
-	github.com/urfave/cli/v2 v2.25.3
+	github.com/urfave/cli/v2 v2.25.4
 	golang.org/x/net v0.10.0
 )
 
