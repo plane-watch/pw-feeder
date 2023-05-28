@@ -1,20 +1,21 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sync"
 	"time"
 
-	"github.com/urfave/cli/v2"
-
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
 	app := &cli.App{
-		Version:     "20230526",
 		Name:        "pw-feeder",
 		Description: `Plane Watch Feeder Client`,
 		Flags: []cli.Flag{
@@ -72,8 +73,25 @@ func main() {
 		Action: runFeeder,
 	}
 
+	// get version from git info
+	var commithash = func() string {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			for _, setting := range info.Settings {
+				if setting.Key == "vcs.revision" {
+					return setting.Value
+				}
+			}
+		}
+		return ""
+	}()
+	app.Version = commithash[:7]
+
 	// configure logging
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+	logConfig := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.UnixDate}
+	logConfig.FormatTimestamp = func(i interface{}) string {
+		return fmt.Sprintf("[%s] \x1b[%dm%v\x1b[0m", app.Name, 90, i) // 90 = Dark Gray colour
+	}
+	log.Logger = log.Output(logConfig)
 
 	// Set logging level
 	app.Before = func(c *cli.Context) error {
@@ -93,6 +111,16 @@ func main() {
 
 func runFeeder(ctx *cli.Context) error {
 	log.Info().Str("version", ctx.App.Version).Msg("plane.watch feeder started")
+
+	// sanity checks on api key entered
+	apikey, err := uuid.Parse(ctx.String("apikey"))
+	if err != nil {
+		return errors.New("The API Key provided isn't a valid UUID, please check the arguments or environment file in your docker-compose.yml and try again")
+	}
+
+	if apikey.String() == "00000000-0000-0000-0000-000000000000" {
+		return errors.New("The API Key provided is the default API key in the documentation, please update the arguments or environment file in your docker-compose.yml and try again")
+	}
 
 	wg := sync.WaitGroup{}
 
