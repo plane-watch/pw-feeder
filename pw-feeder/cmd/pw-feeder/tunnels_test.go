@@ -77,6 +77,7 @@ func TestTunnelInboundConnection(t *testing.T) {
 	go tunnelInboundConnection("test", "127.0.0.1:32349", "127.0.0.1:32348", "A30101A1-30AA-4DFD-9B91-7168BE952A73", func() {})
 
 	// give the above goroutine a couple secs to start properly
+	// TODO: must be a better way than to sleep...
 	time.Sleep(time.Second * 3)
 
 	// start test TCP client
