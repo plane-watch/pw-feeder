@@ -1,5 +1,7 @@
 # pw-feeder
 
+[![codecov](https://codecov.io/gh/plane-watch/pw-feeder/branch/main/graph/badge.svg?token=8Y55DNDVEE)](https://codecov.io/gh/plane-watch/pw-feeder)
+
 Feeder client for plane.watch.
 
 Tunnels BEAST and MLAT data from your client to plane.watch over a TLS tunnel.
@@ -20,5 +22,6 @@ Tunnels BEAST and MLAT data from your client to plane.watch over a TLS tunnel.
 * Clone the repo
 * Change into the `pw-feeder` directory
 * Run `go mod tidy` to download required modules
+* Test: `go test ./...`
 * Build: `go build ./...`
 * Install: `go install ./...`
