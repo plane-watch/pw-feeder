@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -10,6 +11,10 @@ import (
 )
 
 type ATCStatus struct {
+	Status StatusEntry `json:"status"`
+}
+
+type StatusEntry struct {
 	ADSB ProtocolStatus `json:"adsb"`
 	MLAT ProtocolStatus `json:"mlat"`
 }
@@ -43,6 +48,10 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) {
 
 	// print response body
 	fmt.Println(string(body))
+
+	err = json.Unmarshal(body, &S)
+
+	fmt.Println(S)
 
 }
 
