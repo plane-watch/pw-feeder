@@ -6,7 +6,6 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -26,43 +25,44 @@ type ProtocolStatus struct {
 	LastSeen  time.Time `json:"last_seen"`
 }
 
-func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) {
+func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 
+	// make atc api request
 	requestURL := fmt.Sprintf("%s/api/v1/feeders/%s/status.json", atcUrl, apiKey)
 	res, err := http.Get(requestURL)
 	if err != nil {
-		fmt.Printf("error making http request: %s\n", err)
-		os.Exit(1)
+		log.Err(err).Str("url", requestURL).Msg("error making http request")
+		return err
 	}
-
-	fmt.Printf("client: got response!\n")
-	fmt.Printf("client: status code: %d\n", res.StatusCode)
 
 	// read response body
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Err(err).Msg("error reading http response body")
+		return err
 	}
 
 	// close response body
-	res.Body.Close()
+	defer res.Body.Close()
 
-	// print response body
-	fmt.Println(string(body))
-
+	// unmarshall response
 	err = json.Unmarshal(body, &S)
+	if err != nil {
+		log.Err(err).Msg("error unmarshalling json")
+		return err
+	}
 
-	fmt.Println(S)
-
+	return nil
 }
 
 func initStatusUpdater(atcUrl, apiKey string, whenDone func()) {
 	S := ATCStatus{}
 	for {
 		time.Sleep(time.Duration((240 + rand.Intn(120))) * time.Second) // 5 mins +/- up to 1 min
-		S.getStatusFromATC(atcUrl, apiKey)
-		log.Info().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("Connection Status")
+		err := S.getStatusFromATC(atcUrl, apiKey)
+		if err == nil {
+			log.Info().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch connection status")
+		}
 	}
 	whenDone()
 }
