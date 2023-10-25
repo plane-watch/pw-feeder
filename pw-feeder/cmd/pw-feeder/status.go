@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
@@ -29,7 +30,19 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) {
 
 	fmt.Printf("client: got response!\n")
 	fmt.Printf("client: status code: %d\n", res.StatusCode)
-	fmt.Println(res.Body)
+
+	// read response body
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// close response body
+	res.Body.Close()
+
+	// print response body
+	fmt.Println(string(body))
 
 }
 
