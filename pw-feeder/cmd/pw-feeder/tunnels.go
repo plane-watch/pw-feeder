@@ -76,7 +76,7 @@ func logStats(ts *tunnelStats, proto string) {
 	for {
 		time.Sleep(300 * time.Second)
 		bytesRxLocal, bytesTxLocal, bytesRxRemote, bytesTxRemote := ts.readStats()
-		log.Info().Uint64("bytesRxLocal", bytesRxLocal).Uint64("bytesTxLocal", bytesTxLocal).Uint64("bytesRxRemote", bytesRxRemote).Uint64("bytesTxRemote", bytesTxRemote).Str("proto", proto).Msg("Current Connection Statistics")
+		log.Info().Uint64("bytesRxLocal", bytesRxLocal).Uint64("bytesTxLocal", bytesTxLocal).Uint64("bytesRxRemote", bytesRxRemote).Uint64("bytesTxRemote", bytesTxRemote).Str("proto", proto).Msg("connection statistics")
 	}
 }
 
