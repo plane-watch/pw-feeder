@@ -64,6 +64,13 @@ func main() {
 				Value:   "feed.push.plane.watch:12346",
 				EnvVars: []string{"PW_MLAT_ENDPOINT"},
 			},
+			&cli.StringFlag{
+				Name:    "atcurl",
+				Hidden:  true,
+				Usage:   "atc.plane.watch base URL for API calls",
+				Value:   "http://atc.plane.watch",
+				EnvVars: []string{"PW_ATC_URL"},
+			},
 			&cli.BoolFlag{
 				Name:    "debug",
 				Usage:   "Enable debug logging",
@@ -140,6 +147,14 @@ func runFeeder(ctx *cli.Context) error {
 		"MLAT",
 		fmt.Sprintf("%s:%s", ctx.String("mlatserverhost"), ctx.String("mlatserverport")),
 		ctx.String("mlatout"),
+		ctx.String("apikey"),
+		wg.Done,
+	)
+
+	// start status updater
+	wg.Add(1)
+	go initStatusUpdater(
+		ctx.String("atcurl"),
 		ctx.String("apikey"),
 		wg.Done,
 	)
