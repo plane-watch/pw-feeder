@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type ATCStatus struct {
@@ -58,8 +60,9 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) {
 func initStatusUpdater(atcUrl, apiKey string, whenDone func()) {
 	S := ATCStatus{}
 	for {
+		time.Sleep(time.Duration((240 + rand.Intn(120))) * time.Second) // 5 mins +/- up to 1 min
 		S.getStatusFromATC(atcUrl, apiKey)
-		time.Sleep(time.Duration((540 + rand.Intn(120))) * time.Second) // 10 mins +/- up to 1 min
+		log.Info().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("Connection Status")
 	}
 	whenDone()
 }
