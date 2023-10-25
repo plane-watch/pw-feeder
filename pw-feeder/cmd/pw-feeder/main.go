@@ -117,7 +117,7 @@ func main() {
 }
 
 func runFeeder(ctx *cli.Context) error {
-	log.Info().Str("version", ctx.App.Version).Msg("plane.watch feeder started")
+	log.Info().Str("commithash", ctx.App.Version).Msg("plane.watch feeder started")
 
 	// sanity checks on api key entered
 	apikey, err := uuid.Parse(ctx.String("apikey"))
