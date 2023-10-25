@@ -62,9 +62,9 @@ func initStatusUpdater(atcUrl, apiKey string, whenDone func()) {
 		err := S.getStatusFromATC(atcUrl, apiKey)
 		if err == nil {
 			if S.Status.ADSB.Connected && S.Status.MLAT.Connected {
-				log.Info().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch connection status")
+				log.Info().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch reported connection status")
 			} else {
-				log.Warn().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch connection status")
+				log.Warn().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch reported connection status")
 			}
 		}
 	}
