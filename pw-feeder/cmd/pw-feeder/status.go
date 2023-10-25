@@ -21,6 +21,7 @@ type StatusEntry struct {
 }
 
 type ProtocolStatus struct {
+	status    string
 	Connected bool      `json:"connected"`
 	LastSeen  time.Time `json:"last_seen"`
 }
@@ -52,6 +53,17 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 		return err
 	}
 
+	if S.Status.ADSB.Connected {
+		S.Status.ADSB.status = "healthy"
+	} else {
+		S.Status.ADSB.status = "unhealthy"
+	}
+	if S.Status.MLAT.Connected {
+		S.Status.MLAT.status = "healthy"
+	} else {
+		S.Status.MLAT.status = "unhealthy"
+	}
+
 	return nil
 }
 
@@ -62,9 +74,9 @@ func initStatusUpdater(atcUrl, apiKey string, whenDone func()) {
 		err := S.getStatusFromATC(atcUrl, apiKey)
 		if err == nil {
 			if S.Status.ADSB.Connected && S.Status.MLAT.Connected {
-				log.Info().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch reported connection status")
+				log.Info().Str("ADSB", S.Status.ADSB.status).Str("MLAT", S.Status.MLAT.status).Msg("atc.plane.watch reported connection status")
 			} else {
-				log.Warn().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch reported connection status")
+				log.Warn().Str("ADSB", S.Status.ADSB.status).Str("MLAT", S.Status.MLAT.status).Msg("atc.plane.watch reported connection status")
 			}
 		}
 	}
