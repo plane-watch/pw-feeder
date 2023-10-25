@@ -35,15 +35,15 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 		return err
 	}
 
+	// defer closure response body
+	defer res.Body.Close()
+
 	// read response body
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		log.Err(err).Msg("error reading http response body")
 		return err
 	}
-
-	// close response body
-	defer res.Body.Close()
 
 	// unmarshall response
 	err = json.Unmarshal(body, &S)
@@ -61,7 +61,11 @@ func initStatusUpdater(atcUrl, apiKey string, whenDone func()) {
 		time.Sleep(time.Duration((240 + rand.Intn(120))) * time.Second) // 5 mins +/- up to 1 min
 		err := S.getStatusFromATC(atcUrl, apiKey)
 		if err == nil {
-			log.Info().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch connection status")
+			if S.Status.ADSB.Connected && S.Status.MLAT.Connected {
+				log.Info().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch connection status")
+			} else {
+				log.Warn().Bool("ADSB", S.Status.ADSB.Connected).Bool("MLAT", S.Status.MLAT.Connected).Msg("atc.plane.watch connection status")
+			}
 		}
 	}
 	whenDone()
