@@ -116,9 +116,12 @@ func main() {
 	}
 
 	// Run & final exit
-	if err := app.Run(os.Args); nil != err {
+	err := app.Run(os.Args)
+	if err != nil {
 		log.Err(err).Msg("plane.watch feeder finishing with an error")
 		os.Exit(1)
+	} else {
+		log.Info().Msg("plane.watch feeder finishing without error")
 	}
 
 }
@@ -194,6 +197,7 @@ func runFeeder(cliContext *cli.Context) error {
 
 	// wait for sigterm
 	_ = <-sigTermChan
+	log.Info().Msg("received SIGTERM, stopping")
 	cancel()
 	atc_status.Stop()
 
