@@ -38,12 +38,12 @@ jobs:
       run: |
         cd pw-feeder
         GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build ./cmd/pw-feeder
-        tar cJvf ../pw-feeder.${{ github.ref }}.${{ matrix.os }}.${{ matrix.arch }}.tar.xz ./pw-feeder
+        tar cJvf ../pw-feeder.${{ github.ref_name }}.${{ matrix.os }}.${{ matrix.arch }}.tar.xz ./pw-feeder
         rm -v ./pw-feeder
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: ./pw-feeder.${{ github.ref }}.${{ matrix.os }}.${{ matrix.arch }}.tar.xz
-        asset_name: ./pw-feeder.${{ github.ref }}.${{ matrix.os }}.${{ matrix.arch }}.tar.xz
+        file: ./pw-feeder.${{ github.ref_name }}.${{ matrix.os }}.${{ matrix.arch }}.tar.xz
+        asset_name: ./pw-feeder.${{ github.ref_name }}.${{ matrix.os }}.${{ matrix.arch }}.tar.xz
         tag: ${{ github.ref }}
