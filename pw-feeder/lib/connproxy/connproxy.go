@@ -146,6 +146,8 @@ func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoi
 			continue
 		}
 
+		log.Info().Msg("initiating connection to BEAST provider")
+
 		// connect local end point
 		lc, err := network.ConnectToHost(protoname, localaddr)
 		if err != nil {
@@ -156,7 +158,7 @@ func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoi
 		}
 
 		// update user
-		log.Info().Msg("connection to plane.watch established")
+		log.Info().Msg("feeding data to plane.watch")
 
 		// start tunneling data
 		// This will block until there is an error or the connection is closed
@@ -236,6 +238,7 @@ func ProxyInboundConnection(ctx context.Context, protoname string, listener net.
 			time.Sleep(errSleepTime)
 			continue
 		}
+
 		lc, err := listener.Accept()
 		if err != nil {
 			if strings.Contains(err.Error(), "timeout") {
@@ -249,7 +252,9 @@ func ProxyInboundConnection(ctx context.Context, protoname string, listener net.
 
 		// update logger context
 		log = log.With().Str("src", lc.RemoteAddr().String()).Logger()
-		log.Info().Msg("connection established to local data source")
+		log.Info().Msg("connection established from mlat-client")
+
+		log.Info().Msg("initiating tunnel connection to plane.watch")
 
 		// connect plane.watch endpoint
 		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey)
@@ -260,7 +265,7 @@ func ProxyInboundConnection(ctx context.Context, protoname string, listener net.
 		}
 
 		// update user
-		log.Info().Msg("connection to plane.watch established")
+		log.Info().Msg("feeding data to plane.watch")
 
 		// tunnel data
 		innerWg.Add(1)
