@@ -206,7 +206,7 @@ func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoi
 func ProxyInboundConnection(ctx context.Context, protoname string, listener net.Listener, pwendpoint, apikey string) {
 
 	log := log.With().Str("listen", listener.Addr().String()).Str("dst", pwendpoint).Str("proto", protoname).Logger()
-	log.Info().Msg("starting listener service")
+	log.Info().Msg("listening for connections from mlat-client")
 
 	outerWg := sync.WaitGroup{}
 
