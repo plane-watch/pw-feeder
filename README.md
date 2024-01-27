@@ -17,11 +17,13 @@ Tunnels BEAST and MLAT data from your client to plane.watch over a TLS tunnel.
 | `--mlatserverport` | `MLATSERVERPORT` | Listen port for `mlat-client` server connection | `30105` |
 | `--debug` | `DEBUG` | Enable debug logging | `false` |
 
-## Building & Installing
+## Installing from Binary
+
+
+## Building & Installing from Source
 
 * Clone the repo
 * Change into the `pw-feeder` directory
 * Run `go mod tidy` to download required modules
 * Test: `go test ./...`
-* Build: `go build ./...`
-* Install: `go install ./...`
+* Build & Install: `go -o /usr/local/bin/pw-feeder build ./cmd/pw-feeder`

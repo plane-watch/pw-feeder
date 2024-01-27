@@ -1,4 +1,4 @@
-package main
+package stunnel
 
 import (
 	"crypto/tls"
@@ -11,9 +11,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
+func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 
-	logger := log.With().Str("name", name).Str("addr", addr).Logger()
+	log := log.With().Str("name", name).Str("addr", addr).Logger()
 
 	// split host/port from addr
 	remoteHost := strings.Split(addr, ":")[0]
@@ -27,7 +27,7 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 			// parse the cert
 			cert, err := x509.ParseCertificate(rawCert)
 			if err != nil {
-				logger.Err(err).Msg("could not parse server cert")
+				log.Err(err).Msg("could not parse server cert")
 				return err
 			}
 
@@ -37,14 +37,14 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				// ensure the certificate hostname matches the host we're trying to connect to
 				err := cert.VerifyHostname(remoteHost)
 				if err != nil {
-					logger.Err(err).Str("host", remoteHost).Msg("could not verify server cert hostname")
+					log.Err(err).Str("host", remoteHost).Msg("could not verify server cert hostname")
 					return err
 				}
 
 				// load root CAs
 				scp, err := x509.SystemCertPool()
 				if err != nil {
-					logger.Err(err).Caller().Msg("could not use system cert pool")
+					log.Err(err).Caller().Msg("could not use system cert pool")
 					return err
 				}
 
@@ -56,17 +56,17 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				vo.DNSName = remoteHost
 				_, err = cert.Verify(vo)
 				if err != nil {
-					logger.Warn().AnErr("err", err).Caller().Msg("could not verify server cert")
+					log.Warn().AnErr("err", err).Caller().Msg("could not verify server cert")
 					// return err
 				}
 
 				// check validity dates
 				if time.Now().Before(cert.NotBefore) {
-					logger.Err(err).Caller().Time("notbefore", cert.NotBefore).Msg("time.Now() is before cert notbefore")
+					log.Err(err).Caller().Time("notbefore", cert.NotBefore).Msg("time.Now() is before cert notbefore")
 					return errors.New("time.Now() is before cert notbefore")
 				}
 				if time.Now().After(cert.NotAfter) {
-					logger.Err(err).Caller().Time("notafter", cert.NotAfter).Msg("time.Now() is after cert notafter")
+					log.Err(err).Caller().Time("notafter", cert.NotAfter).Msg("time.Now() is after cert notafter")
 					return errors.New("time.Now() is before cert notafter")
 				}
 			}
@@ -77,7 +77,7 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 	// load root CAs
 	scp, err := x509.SystemCertPool()
 	if err != nil {
-		logger.Err(err).Caller().Msg("could not use system cert pool")
+		log.Err(err).Caller().Msg("could not use system cert pool")
 		return c, err
 	}
 
@@ -96,18 +96,18 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 	// dial remote
 	c, err = tls.DialWithDialer(&d, "tcp", addr, &tlsConfig)
 	if err != nil {
-		logger.Err(err).Caller().Msg("could not connect")
+		log.Err(err).Caller().Msg("could not connect")
 		return c, err
 	}
 
 	// perform handshake
 	err = c.Handshake()
 	if err != nil {
-		logger.Err(err).Caller().Msg("handshake error")
+		log.Err(err).Caller().Msg("handshake error")
 		return c, err
 	}
 
-	logger.Debug().Msg("endpoint connected")
+	log.Debug().Msg("endpoint connected")
 	return c, err
 
 }

@@ -16,6 +16,17 @@ on:
       - '**.yml'
       - '.gitattributes'
       - '.gitignore'
+  push:
+    # Only publish on push to main branch
+    branches:
+      - main
+    # Don't trigger if it's just a documentation update
+    paths-ignore:
+      - '**.md'
+      - '**.MD'
+      - '**.yml'
+      - '.gitattributes'
+      - '.gitignore'
 
 jobs:
 
@@ -31,7 +42,7 @@ jobs:
       - name: "go test"
         run: |
           cd pw-feeder
-          go test -v -coverprofile=coverage.txt ./...
+          go test -v -race -timeout=300s -count=3 -coverprofile=coverage.txt ./...
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v3
       - name: "go build"
