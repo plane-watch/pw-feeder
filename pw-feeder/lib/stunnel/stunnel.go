@@ -1,4 +1,4 @@
-package main
+package stunnel
 
 import (
 	"crypto/tls"
@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
+func StunnelConnect(name, addr, sni string, InsecureSkipVerify bool) (c *tls.Conn, err error) {
 
 	logger := log.With().Str("name", name).Str("addr", addr).Logger()
 
@@ -85,7 +85,7 @@ func stunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 	tlsConfig := tls.Config{
 		RootCAs:               scp,
 		ServerName:            sni,
-		InsecureSkipVerify:    true,
+		InsecureSkipVerify:    InsecureSkipVerify,
 		VerifyPeerCertificate: customVerify,
 	}
 

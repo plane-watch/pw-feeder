@@ -1,4 +1,4 @@
-package main
+package network
 
 import (
 	"net"
@@ -7,19 +7,22 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func connectToHost(name, addr string) (c net.Conn, err error) {
+// ConnectToHost connects to a host, returns a connection object
+func ConnectToHost(name, addr string) (c net.Conn, err error) {
 
+	// set log context
 	logger := log.With().Str("name", name).Str("addr", addr).Logger()
 
-	// establish connection to local remote host
+	// prepare dialer with timeout
 	d := net.Dialer{
 		Timeout: 10 * time.Second,
 	}
+
+	// dial out
 	c, err = d.Dial("tcp", addr)
 	if err != nil {
-		logger.Err(err).Msg("error dialling")
+		logger.Err(err).Msg("error establishing connection")
 	}
-
 	logger.Debug().Msg("endpoint connected")
 
 	return c, err
