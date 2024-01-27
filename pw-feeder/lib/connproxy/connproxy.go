@@ -239,7 +239,7 @@ func ProxyInboundConnection(ctx context.Context, protoname string, listener net.
 		}
 		lc, err := listener.Accept()
 		if err != nil {
-			if !strings.Contains(err.Error(), "timeout") {
+			if strings.Contains(err.Error(), "timeout") {
 				continue
 			} else {
 				log.Err(err).Msg("An error occurred attempting to accept the incoming connection")
