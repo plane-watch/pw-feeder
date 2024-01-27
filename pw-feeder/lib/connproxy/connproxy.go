@@ -3,6 +3,7 @@ package connproxy
 import (
 	"context"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -238,9 +239,13 @@ func ProxyInboundConnection(ctx context.Context, protoname string, listener net.
 		}
 		lc, err := listener.Accept()
 		if err != nil {
-			log.Err(err).Msg("An error occurred attempting to accept the incoming connection")
-			time.Sleep(errSleepTime)
-			continue
+			if !strings.Contains(err.Error(), "timeout") {
+				continue
+			} else {
+				log.Err(err).Msg("An error occurred attempting to accept the incoming connection")
+				time.Sleep(errSleepTime)
+				continue
+			}
 		}
 
 		// update logger context
