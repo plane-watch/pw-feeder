@@ -259,6 +259,9 @@ func ProxyInboundConnection(ctx context.Context, protoname string, listener net.
 			continue
 		}
 
+		// update user
+		log.Info().Msg("connection to plane.watch established")
+
 		// tunnel data
 		innerWg.Add(1)
 		go func() {
