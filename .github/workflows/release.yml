@@ -2,8 +2,7 @@
 name: Upload Release Asset
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 jobs:
   upload:
@@ -31,8 +30,6 @@ jobs:
         GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build ./cmd/pw-feeder
         tar cJvf ../pw-feeder.${{ github.ref }}.${{ matrix.os }}.${{ matrix.arch }}.tar.xz ./pw-feeder
         rm -v ./pw-feeder
-
-
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
