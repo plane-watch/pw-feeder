@@ -50,11 +50,17 @@ func dataMover(connIn net.Conn, connOut net.Conn) (bytesRead, bytesWritten int, 
 	buf := make([]byte, 256*1024) // 256kB buffer
 	bytesRead, err = connIn.Read(buf)
 	if err != nil {
+		if strings.Contains(err.Error(), "use of closed network connection") {
+			return
+		}
 		log.Err(err).Msg("error reading from socket")
 		return
 	}
 	bytesWritten, err = connOut.Write(buf[:bytesRead])
 	if err != nil {
+		if strings.Contains(err.Error(), "use of closed network connection") {
+			return
+		}
 		log.Err(err).Msg("error writing to socket")
 		return
 	}
