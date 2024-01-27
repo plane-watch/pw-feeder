@@ -109,7 +109,7 @@ func logStats(ctx context.Context, ts *tunnelStats, proto string, interval time.
 	}
 }
 
-func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoint, apikey string) {
+func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint, apikey string) {
 
 	log := log.With().Str("src", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Logger()
 
@@ -158,7 +158,7 @@ func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoi
 		}
 
 		// update user
-		log.Info().Msg("feeding data to plane.watch")
+		log.Info().Msg("feeding BEAST data to plane.watch")
 
 		// start tunneling data
 		// This will block until there is an error or the connection is closed
@@ -203,7 +203,7 @@ func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoi
 	}
 }
 
-func ProxyInboundConnection(ctx context.Context, protoname string, listener net.Listener, pwendpoint, apikey string) {
+func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Listener, pwendpoint, apikey string) {
 
 	log := log.With().Str("listen", listener.Addr().String()).Str("dst", pwendpoint).Str("proto", protoname).Logger()
 	log.Info().Msg("listening for connections from mlat-client")
@@ -265,7 +265,7 @@ func ProxyInboundConnection(ctx context.Context, protoname string, listener net.
 		}
 
 		// update user
-		log.Info().Msg("feeding data to plane.watch")
+		log.Info().Msg("feeding MLAT results to plane.watch")
 
 		// tunnel data
 		innerWg.Add(1)

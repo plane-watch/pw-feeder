@@ -158,7 +158,7 @@ func runFeeder(cliContext *cli.Context) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		connproxy.ProxyOutboundConnection(
+		connproxy.ProxyBEASTConnection(
 			ctx,
 			"BEAST",
 			fmt.Sprintf("%s:%s", cliContext.String("beasthost"), cliContext.String("beastport")),
@@ -171,7 +171,7 @@ func runFeeder(cliContext *cli.Context) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		connproxy.ProxyInboundConnection(
+		connproxy.ProxyMLATConnection(
 			ctx,
 			"MLAT",
 			listenMLAT,

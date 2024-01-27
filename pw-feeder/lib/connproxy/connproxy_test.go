@@ -326,7 +326,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ProxyOutboundConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
 		}()
 
 		// wait for a connection attempt
@@ -383,7 +383,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ProxyOutboundConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
 		}()
 
 		// wait for a connection attempt
@@ -485,7 +485,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ProxyOutboundConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
 		}()
 
 		// wait for data transfers
@@ -562,7 +562,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ProxyOutboundConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
 			t.Log("ProxyOutboundConnection done")
 			finishChan <- true
 			finishChan <- true
@@ -643,7 +643,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ProxyOutboundConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
 			t.Log("ProxyOutboundConnection done")
 		}()
 
@@ -722,7 +722,7 @@ func TestProxyInboundConnection(t *testing.T) {
 		wg.Add(1)
 		go func(t *testing.T) {
 			defer wg.Done()
-			ProxyInboundConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
 		}(t)
 
 		// wait for connection attempts
@@ -762,7 +762,7 @@ func TestProxyInboundConnection(t *testing.T) {
 		wg.Add(1)
 		go func(t *testing.T) {
 			defer wg.Done()
-			ProxyInboundConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
 		}(t)
 
 		// mock mlat-client
@@ -843,7 +843,7 @@ func TestProxyInboundConnection(t *testing.T) {
 		wg.Add(1)
 		go func(t *testing.T) {
 			defer wg.Done()
-			ProxyInboundConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
 		}(t)
 
 		// mock mlat-client
@@ -946,7 +946,7 @@ func TestProxyInboundConnection(t *testing.T) {
 		wg.Add(1)
 		go func(t *testing.T) {
 			defer wg.Done()
-			ProxyInboundConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
 		}(t)
 
 		// mock mlat-client
