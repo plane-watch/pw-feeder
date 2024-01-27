@@ -204,6 +204,7 @@ func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoi
 func ProxyInboundConnection(ctx context.Context, protoname string, listener net.Listener, pwendpoint, apikey string) {
 
 	log := log.With().Str("listen", listener.Addr().String()).Str("dst", pwendpoint).Str("proto", protoname).Logger()
+	log.Info().Msg("starting listener service")
 
 	outerWg := sync.WaitGroup{}
 
@@ -227,8 +228,6 @@ func ProxyInboundConnection(ctx context.Context, protoname string, listener net.
 			return
 		default:
 		}
-
-		log.Info().Msg("starting listener service")
 
 		// wait for local connection with deadline
 		err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(time.Second * 1))
