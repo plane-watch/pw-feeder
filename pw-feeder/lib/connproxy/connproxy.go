@@ -26,7 +26,7 @@ var (
 
 	// wrapper to stunnelConnect to allow overriding for testing
 	connectToPlaneWatch = func(name string, addr string, sni string) (c net.Conn, err error) {
-		return stunnel.StunnelConnect(name, addr, sni, false)
+		return stunnel.StunnelConnect(name, addr, sni)
 	}
 )
 
@@ -110,7 +110,7 @@ func logStats(ctx context.Context, ts *tunnelStats, proto string, interval time.
 
 func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoint, apikey string) {
 
-	logger := log.With().Str("src", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Logger()
+	log := log.With().Str("src", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Logger()
 
 	outerWg := sync.WaitGroup{}
 
@@ -135,12 +135,12 @@ func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoi
 		default:
 		}
 
-		logger.Info().Msg("initiating tunnel connection to plane.watch")
+		log.Info().Msg("initiating tunnel connection to plane.watch")
 
 		// connect plane.watch endpoint
 		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection")
+			log.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection")
 			time.Sleep(errSleepTime)
 			continue
 		}
@@ -148,14 +148,14 @@ func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoi
 		// connect local end point
 		lc, err := network.ConnectToHost(protoname, localaddr)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running and listening on the specified port")
+			log.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running and listening on the specified port")
 			pwc.Close()
 			time.Sleep(errSleepTime)
 			continue
 		}
 
 		// update user
-		logger.Info().Msg("connection to plane.watch established")
+		log.Info().Msg("connection to plane.watch established")
 
 		// start tunneling data
 		// This will block until there is an error or the connection is closed
@@ -195,7 +195,7 @@ func ProxyOutboundConnection(ctx context.Context, protoname, localaddr, pwendpoi
 			lc.Close()
 			pwc.Close()
 			// let user know
-			logger.Warn().Msg("tunnel to plane.watch has been terminated")
+			log.Warn().Msg("tunnel to plane.watch has been terminated")
 		}
 	}
 }

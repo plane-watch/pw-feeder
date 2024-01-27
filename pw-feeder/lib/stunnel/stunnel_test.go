@@ -194,7 +194,7 @@ func TestStunnel(t *testing.T) {
 		}
 	}(t)
 
-	conn, err := StunnelConnect("TEST", listener.Addr().String(), testSNI.String(), true)
+	conn, err := StunnelConnect("TEST", listener.Addr().String(), testSNI.String())
 	require.NoError(t, err)
 
 	// test write
@@ -228,7 +228,7 @@ func TestStunnel_cantconnect(t *testing.T) {
 	listener.Close()
 
 	// test
-	_, err = StunnelConnect("TEST", listener.Addr().String(), testSNI.String(), true)
+	_, err = StunnelConnect("TEST", listener.Addr().String(), testSNI.String())
 	require.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "connection refused"))
 
@@ -281,7 +281,7 @@ func TestStunnel_tlserror(t *testing.T) {
 	}(t)
 
 	// test
-	_, err = StunnelConnect("TEST", listener.Addr().String(), testSNI.String(), true)
+	_, err = StunnelConnect("TEST", listener.Addr().String(), testSNI.String())
 	require.Error(t, err)
 
 	// clean up

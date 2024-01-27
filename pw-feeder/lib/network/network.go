@@ -11,7 +11,7 @@ import (
 func ConnectToHost(name, addr string) (c net.Conn, err error) {
 
 	// set log context
-	logger := log.With().Str("name", name).Str("addr", addr).Logger()
+	log := log.With().Str("name", name).Str("addr", addr).Logger()
 
 	// prepare dialer with timeout
 	d := net.Dialer{
@@ -21,9 +21,9 @@ func ConnectToHost(name, addr string) (c net.Conn, err error) {
 	// dial out
 	c, err = d.Dial("tcp", addr)
 	if err != nil {
-		logger.Err(err).Msg("error establishing connection")
+		log.Err(err).Msg("error establishing connection")
 	}
-	logger.Debug().Msg("endpoint connected")
+	log.Debug().Msg("endpoint connected")
 
 	return c, err
 }

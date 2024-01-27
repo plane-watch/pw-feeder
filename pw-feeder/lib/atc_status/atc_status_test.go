@@ -261,8 +261,8 @@ func TestStartStop(t *testing.T) {
 		// wait for everything to finish
 		wg.Wait()
 
-		fmt.Println(testCtx.Deadline())
-		fmt.Println(testCtx.Err())
+		// fmt.Println(testCtx.Deadline())
+		// fmt.Println(testCtx.Err())
 
 	})
 
@@ -300,8 +300,8 @@ func TestStartStop(t *testing.T) {
 		// wait for everything to finish
 		wg.Wait()
 
-		fmt.Println(testCtx.Deadline())
-		fmt.Println(testCtx.Err())
+		// fmt.Println(testCtx.Deadline())
+		// fmt.Println(testCtx.Err())
 
 	})
 }
