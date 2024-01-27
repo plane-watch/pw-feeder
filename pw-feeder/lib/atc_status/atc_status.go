@@ -8,10 +8,8 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -37,10 +35,6 @@ var (
 
 	ErrResponseNotOK = errors.New("HTTP response code not OK")
 )
-
-func init() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.UnixDate}).With().Str("module", "atc_status").Logger()
-}
 
 func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 

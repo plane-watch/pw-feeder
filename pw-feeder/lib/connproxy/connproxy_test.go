@@ -3,11 +3,14 @@ package connproxy
 import (
 	"context"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/nettest"
@@ -16,6 +19,10 @@ import (
 var (
 	TestClientAPIKey = uuid.New()
 )
+
+func init() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.UnixDate})
+}
 
 func TestTunnelStats(t *testing.T) {
 	ts := tunnelStats{}

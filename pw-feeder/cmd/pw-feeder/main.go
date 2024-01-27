@@ -86,21 +86,18 @@ var (
 	}
 )
 
-func main() {
-	// get version from git info
-	var commithash = func() string {
-		if info, ok := debug.ReadBuildInfo(); ok {
-			for _, setting := range info.Settings {
-				if setting.Key == "vcs.revision" {
-					return setting.Value
-				}
+func commithash() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" {
+				return setting.Value
 			}
 		}
-		return ""
-	}()
+	}
+	return ""
+}
 
-	app.Version = commithash[:7]
-
+func main() {
 	app.Action = runFeeder
 
 	// configure logging
@@ -127,7 +124,10 @@ func main() {
 }
 
 func runFeeder(cliContext *cli.Context) error {
-	log.Info().Str("commithash", cliContext.App.Version).Msg("plane.watch feeder started")
+	log.Info().
+		Str("commithash", commithash()[:7]).
+		Str("version", app.Version).
+		Msg("plane.watch feeder started")
 
 	// sanity checks on api key entered
 	apikey, err := uuid.Parse(cliContext.String("apikey"))
