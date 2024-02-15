@@ -26,4 +26,4 @@ Tunnels BEAST and MLAT data from your client to plane.watch over a TLS tunnel.
 * Change into the `pw-feeder` directory
 * Run `go mod tidy` to download required modules
 * Test: `go test ./...`
-* Build & Install: `go -o /usr/local/bin/pw-feeder build ./cmd/pw-feeder`
+* Build & Install: `go build -o /usr/local/bin/pw-feeder ./cmd/pw-feeder`
