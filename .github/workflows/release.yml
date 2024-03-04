@@ -3,6 +3,8 @@ name: Upload Release Asset
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
   codecov:
@@ -21,16 +23,19 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
 
-  upload:
+  upload_linux:
+    name: Linux Binaries
     needs: codecov
     strategy:
       matrix:
         os: [linux]
         arch: [386,amd64,arm,arm64]
-    name: Upload
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
     - name: "go mod tidy"
       run: |
         cd pw-feeder
