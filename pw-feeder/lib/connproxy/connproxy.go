@@ -169,16 +169,21 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		// start tunneling data
 		// This will block until there is an error or the connection is closed
 
+		// prep context for data movers
+		dataMoverCtx, dataMoverCancel := context.WithCancel(ctx)
+
 		innerWg.Add(1)
 		go func() {
 			defer innerWg.Done()
-			dataMoverNettoTLS(ctx, lc, pwc, &ts)
+			defer dataMoverCancel()
+			dataMoverNettoTLS(dataMoverCtx, lc, pwc, &ts)
 		}()
 
 		innerWg.Add(1)
 		go func() {
 			defer innerWg.Done()
-			dataMoverTLStoNet(ctx, pwc, lc, &ts)
+			defer dataMoverCancel()
+			dataMoverTLStoNet(dataMoverCtx, pwc, lc, &ts)
 		}()
 
 		// chan for waitgroup
