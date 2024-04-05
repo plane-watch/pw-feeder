@@ -190,14 +190,14 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		go func() {
 			defer innerWg.Done()
 			defer dataMoverCancel()
-			dataMoverNettoTLS(dataMoverCtx, lc, pwc, &ts)
+			dataMoverNettoTLS(dataMoverCtx, lc, pwc, &ts, log)
 		}()
 
 		innerWg.Add(1)
 		go func() {
 			defer innerWg.Done()
 			defer dataMoverCancel()
-			dataMoverTLStoNet(dataMoverCtx, pwc, lc, &ts)
+			dataMoverTLStoNet(dataMoverCtx, pwc, lc, &ts, log)
 		}()
 
 		// chan for waitgroup
@@ -296,12 +296,12 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		innerWg.Add(1)
 		go func() {
 			defer innerWg.Done()
-			dataMoverNettoTLS(ctx, lc, pwc, &ts)
+			dataMoverNettoTLS(ctx, lc, pwc, &ts, log)
 		}()
 		innerWg.Add(1)
 		go func() {
 			defer innerWg.Done()
-			dataMoverTLStoNet(ctx, pwc, lc, &ts)
+			dataMoverTLStoNet(ctx, pwc, lc, &ts, log)
 		}()
 
 		// chan for waitgroup
