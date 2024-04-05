@@ -10,6 +10,7 @@ import (
 	"pw-feeder/lib/network"
 	"pw-feeder/lib/stunnel"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -46,7 +47,7 @@ func (ts *tunnelStats) readStats() (bytesRxLocal, bytesTxLocal, bytesRxRemote, b
 	return ts.bytesRxLocal, ts.bytesTxLocal, ts.bytesRxRemote, ts.bytesTxRemote
 }
 
-func dataMover(connIn net.Conn, connOut net.Conn) (bytesRead, bytesWritten int, err error) {
+func dataMover(connIn net.Conn, connOut net.Conn, log zerolog.Logger) (bytesRead, bytesWritten int, err error) {
 	buf := make([]byte, 256*1024) // 256kB buffer
 	bytesRead, err = connIn.Read(buf)
 	if err != nil {
@@ -67,13 +68,13 @@ func dataMover(connIn net.Conn, connOut net.Conn) (bytesRead, bytesWritten int, 
 	return
 }
 
-func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats) {
+func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats, log zerolog.Logger) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			bytesRead, bytesWritten, err := dataMover(connA, connB)
+			bytesRead, bytesWritten, err := dataMover(connA, connB, log)
 			if err != nil {
 				return
 			}
@@ -82,13 +83,13 @@ func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *
 	}
 }
 
-func dataMoverTLStoNet(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats) {
+func dataMoverTLStoNet(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats, log zerolog.Logger) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			bytesRead, bytesWritten, err := dataMover(connA, connB)
+			bytesRead, bytesWritten, err := dataMover(connA, connB, log)
 			if err != nil {
 				return
 			}
