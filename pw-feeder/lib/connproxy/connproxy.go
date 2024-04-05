@@ -2,7 +2,9 @@ package connproxy
 
 import (
 	"context"
+	"errors"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"pw-feeder/lib/network"
 	"pw-feeder/lib/stunnel"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -46,13 +49,24 @@ func (ts *tunnelStats) readStats() (bytesRxLocal, bytesTxLocal, bytesRxRemote, b
 	return ts.bytesRxLocal, ts.bytesTxLocal, ts.bytesRxRemote, ts.bytesTxRemote
 }
 
-func dataMover(connIn net.Conn, connOut net.Conn) (bytesRead, bytesWritten int, err error) {
+func dataMover(connIn net.Conn, connOut net.Conn, log zerolog.Logger) (bytesRead, bytesWritten int, err error) {
 	buf := make([]byte, 256*1024) // 256kB buffer
+
+	// set deadline
+	err = connIn.SetReadDeadline(time.Now().Add(time.Second))
+	if err != nil {
+		return
+	}
+
+	// attempt read
 	bytesRead, err = connIn.Read(buf)
 	if err != nil {
-		if strings.Contains(err.Error(), "use of closed network connection") {
-			return
+
+		// don't raise an error if deadline exceeded
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			return 0, 0, nil
 		}
+
 		log.Err(err).Msg("error reading from socket")
 		return
 	}
@@ -67,13 +81,14 @@ func dataMover(connIn net.Conn, connOut net.Conn) (bytesRead, bytesWritten int, 
 	return
 }
 
-func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats) {
+func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats, log zerolog.Logger) {
+	log = log.With().Str("conn", "client-side").Logger()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			bytesRead, bytesWritten, err := dataMover(connA, connB)
+			bytesRead, bytesWritten, err := dataMover(connA, connB, log)
 			if err != nil {
 				return
 			}
@@ -82,13 +97,14 @@ func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *
 	}
 }
 
-func dataMoverTLStoNet(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats) {
+func dataMoverTLStoNet(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats, log zerolog.Logger) {
+	log = log.With().Str("conn", "server-side").Logger()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			bytesRead, bytesWritten, err := dataMover(connA, connB)
+			bytesRead, bytesWritten, err := dataMover(connA, connB, log)
 			if err != nil {
 				return
 			}
@@ -144,7 +160,7 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 
 		log.Info().Msg("initiating connection to BEAST provider")
 
-		// connect local end point
+		// connect local end point (lc = local connection)
 		lc, err := network.ConnectToHost(protoname, localaddr)
 		if err != nil {
 			log.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running and listening on the specified port")
@@ -154,7 +170,7 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 
 		log.Info().Msg("initiating tunnel connection to plane.watch")
 
-		// connect plane.watch endpoint
+		// connect plane.watch endpoint (pwc = plane.watch connection)
 		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey)
 		if err != nil {
 			log.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection")
@@ -169,16 +185,21 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		// start tunneling data
 		// This will block until there is an error or the connection is closed
 
+		// prep context for data movers
+		dataMoverCtx, dataMoverCancel := context.WithCancel(ctx)
+
 		innerWg.Add(1)
 		go func() {
 			defer innerWg.Done()
-			dataMoverNettoTLS(ctx, lc, pwc, &ts)
+			defer dataMoverCancel()
+			dataMoverNettoTLS(dataMoverCtx, lc, pwc, &ts, log)
 		}()
 
 		innerWg.Add(1)
 		go func() {
 			defer innerWg.Done()
-			dataMoverTLStoNet(ctx, pwc, lc, &ts)
+			defer dataMoverCancel()
+			dataMoverTLStoNet(dataMoverCtx, pwc, lc, &ts, log)
 		}()
 
 		// chan for waitgroup
@@ -277,12 +298,12 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		innerWg.Add(1)
 		go func() {
 			defer innerWg.Done()
-			dataMoverNettoTLS(ctx, lc, pwc, &ts)
+			dataMoverNettoTLS(ctx, lc, pwc, &ts, log)
 		}()
 		innerWg.Add(1)
 		go func() {
 			defer innerWg.Done()
-			dataMoverTLStoNet(ctx, pwc, lc, &ts)
+			dataMoverTLStoNet(ctx, pwc, lc, &ts, log)
 		}()
 
 		// chan for waitgroup

@@ -3,7 +3,6 @@ package stunnel
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"net"
 	"strings"
 	"time"
@@ -56,18 +55,8 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				vo.DNSName = remoteHost
 				_, err = cert.Verify(vo)
 				if err != nil {
-					log.Warn().AnErr("err", err).Caller().Msg("could not verify server cert")
-					// return err
-				}
-
-				// check validity dates
-				if time.Now().Before(cert.NotBefore) {
-					log.Err(err).Caller().Time("notbefore", cert.NotBefore).Msg("time.Now() is before cert notbefore")
-					return errors.New("time.Now() is before cert notbefore")
-				}
-				if time.Now().After(cert.NotAfter) {
-					log.Err(err).Caller().Time("notafter", cert.NotAfter).Msg("time.Now() is after cert notafter")
-					return errors.New("time.Now() is before cert notafter")
+					log.Err(err).Caller().Msg("could not verify server cert")
+					return err
 				}
 			}
 		}

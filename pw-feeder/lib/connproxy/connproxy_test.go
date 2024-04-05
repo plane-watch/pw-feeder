@@ -51,6 +51,8 @@ func TestLogStats(t *testing.T) {
 
 func TestDataMover(t *testing.T) {
 
+	log := log.With().Caller().Logger()
+
 	testBytes := []byte("Hello World! 1234567890")
 
 	t.Run("NettoTLS working", func(t *testing.T) {
@@ -66,7 +68,7 @@ func TestDataMover(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			dataMoverNettoTLS(ctx, connAOut, connBIn, &ts)
+			dataMoverNettoTLS(ctx, connAOut, connBIn, &ts, log)
 		}()
 
 		wg.Add(1)
@@ -111,7 +113,7 @@ func TestDataMover(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			dataMoverNettoTLS(ctx, connAOut, connBIn, &ts)
+			dataMoverNettoTLS(ctx, connAOut, connBIn, &ts, log)
 		}()
 
 		// context cancel
@@ -139,7 +141,7 @@ func TestDataMover(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			dataMoverTLStoNet(ctx, connAOut, connBIn, &ts)
+			dataMoverTLStoNet(ctx, connAOut, connBIn, &ts, log)
 		}()
 
 		// context cancel
@@ -168,7 +170,7 @@ func TestDataMover(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			dataMoverTLStoNet(ctx, connAOut, connBIn, &ts)
+			dataMoverTLStoNet(ctx, connAOut, connBIn, &ts, log)
 		}()
 
 		wg.Add(1)
@@ -211,7 +213,7 @@ func TestDataMover(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			bytesRead, bytesWritten, err := dataMover(connAOut, connBIn)
+			bytesRead, bytesWritten, err := dataMover(connAOut, connBIn, log)
 			require.NoError(t, err)
 			assert.Equal(t, len(testBytes), bytesRead)
 			assert.Equal(t, len(testBytes), bytesWritten)
@@ -256,7 +258,7 @@ func TestDataMover(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, _, err := dataMover(connAOut, connBIn)
+			_, _, err := dataMover(connAOut, connBIn, log)
 			require.Error(t, err)
 		}()
 
