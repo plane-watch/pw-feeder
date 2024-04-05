@@ -82,6 +82,7 @@ func dataMover(connIn net.Conn, connOut net.Conn, log zerolog.Logger) (bytesRead
 }
 
 func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats, log zerolog.Logger) {
+	log = log.With().Str("conn", "client-side").Logger()
 	for {
 		select {
 		case <-ctx.Done():
@@ -97,6 +98,7 @@ func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *
 }
 
 func dataMoverTLStoNet(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats, log zerolog.Logger) {
+	log = log.With().Str("conn", "server-side").Logger()
 	for {
 		select {
 		case <-ctx.Done():
