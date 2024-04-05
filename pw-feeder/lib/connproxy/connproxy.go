@@ -2,7 +2,9 @@ package connproxy
 
 import (
 	"context"
+	"errors"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -49,11 +51,22 @@ func (ts *tunnelStats) readStats() (bytesRxLocal, bytesTxLocal, bytesRxRemote, b
 
 func dataMover(connIn net.Conn, connOut net.Conn, log zerolog.Logger) (bytesRead, bytesWritten int, err error) {
 	buf := make([]byte, 256*1024) // 256kB buffer
+
+	// set deadline
+	err = connIn.SetReadDeadline(time.Now().Add(time.Second))
+	if err != nil {
+		return
+	}
+
+	// attempt read
 	bytesRead, err = connIn.Read(buf)
 	if err != nil {
-		if strings.Contains(err.Error(), "use of closed network connection") {
-			return
+
+		// don't raise an error if deadline exceeded
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			return 0, 0, nil
 		}
+
 		log.Err(err).Msg("error reading from socket")
 		return
 	}
