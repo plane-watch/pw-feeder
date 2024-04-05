@@ -144,7 +144,7 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 
 		log.Info().Msg("initiating connection to BEAST provider")
 
-		// connect local end point
+		// connect local end point (lc = local connection)
 		lc, err := network.ConnectToHost(protoname, localaddr)
 		if err != nil {
 			log.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running and listening on the specified port")
@@ -154,7 +154,7 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 
 		log.Info().Msg("initiating tunnel connection to plane.watch")
 
-		// connect plane.watch endpoint
+		// connect plane.watch endpoint (pwc = plane.watch connection)
 		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey)
 		if err != nil {
 			log.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection")
