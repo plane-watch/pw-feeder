@@ -24,7 +24,7 @@ var (
 	app = &cli.App{
 		Name:        "pw-feeder",
 		Description: `Plane Watch Feeder Client`,
-		Version:     "0.0.1",
+		Version:     "0.0.2",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "apikey",
