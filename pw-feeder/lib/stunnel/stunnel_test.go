@@ -65,6 +65,9 @@ func TestCACerts(t *testing.T) {
 			// check validity
 			assert.True(t, c.NotBefore.Before(time.Now()), "Certificate not yet valid")
 			assert.False(t, c.NotAfter.Before(time.Now()), "Certificate expired")
+
+			// check if certs are due to expire within 90 days
+			assert.True(t, c.NotAfter.After(time.Now().Add(time.Hour*24*90)), "Certificate expires within 90 days")
 		})
 	}
 }
