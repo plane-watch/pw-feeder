@@ -119,7 +119,7 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 	// load root CAs
 	scp, err := x509.SystemCertPool()
 	if err != nil {
-		log.Err(err).Caller().Msg("could not use system cert pool")
+		// log.Err(err).Caller().Msg("could not use system cert pool")
 		return c, err
 	}
 	err = addEmbeddedCertsToCertPool(scp)
@@ -142,18 +142,18 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 	// dial remote
 	c, err = tls.DialWithDialer(&d, "tcp", addr, &tlsConfig)
 	if err != nil {
-		log.Err(err).Caller().Msg("could not connect")
+		// log.Err(err).Caller().Msg("could not connect")
 		return c, err
 	}
 
 	// perform handshake
 	err = c.Handshake()
 	if err != nil {
-		log.Err(err).Caller().Msg("handshake error")
+		// log.Err(err).Caller().Msg("handshake error")
 		return c, err
 	}
 
-	log.Debug().Msg("endpoint connected")
+	// log.Debug().Msg("endpoint connected")
 	return c, err
 
 }
