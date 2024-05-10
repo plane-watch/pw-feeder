@@ -11,6 +11,55 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+func addEmbeddedCertsToCertPool(scp *x509.CertPool) error {
+	// load embedded Let's Encrypt CAs
+	// get list of files in caCertPEMs embed.FS
+	pemFiles, err := caCertPEMs.ReadDir(".")
+	if err != nil {
+		return err
+	}
+
+	// for each file...
+	for _, pemFile := range pemFiles {
+
+		func() {
+
+			log := log.With().Str("cafile", pemFile.Name()).Logger()
+
+			// open file
+			f, err := caCertPEMs.Open(pemFile.Name())
+			if err != nil {
+				log.Err(err).Msg("could not open embedded CA cert")
+			}
+			defer f.Close()
+
+			// get file stat (for size)
+			s, err := f.Stat()
+			if err != nil {
+				log.Err(err).Msg("could not stat embedded CA cert")
+			}
+
+			// read bytes from file
+			b := make([]byte, s.Size())
+			n, err := f.Read(b)
+			if err != nil {
+				log.Err(err).Msg("could not read embedded CA cert")
+			}
+
+			// parse cert
+			p, _ := pem.Decode(b[:n])
+			c, err := x509.ParseCertificate(p.Bytes)
+			if err != nil {
+				log.Err(err).Msg("could not parse embedded CA cert")
+			}
+
+			// add cert to system cert pool
+			scp.AddCert(c)
+		}()
+	}
+	return nil
+}
+
 func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 
 	log := log.With().Str("name", name).Str("addr", addr).Logger()
@@ -47,51 +96,9 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 					log.Err(err).Caller().Msg("could not use system cert pool")
 					return err
 				}
-
-				// load embedded Let's Encrypt CAs
-				// get list of files in caCertPEMs embed.FS
-				pemFiles, err := caCertPEMs.ReadDir(".")
+				err = addEmbeddedCertsToCertPool(scp)
 				if err != nil {
 					return err
-				}
-
-				// for each file...
-				for _, pemFile := range pemFiles {
-
-					func() {
-
-						log := log.With().Str("cafile", pemFile.Name()).Logger()
-
-						// open file
-						f, err := caCertPEMs.Open(pemFile.Name())
-						if err != nil {
-							log.Err(err).Msg("could not open embedded CA cert")
-						}
-						defer f.Close()
-
-						// get file stat (for size)
-						s, err := f.Stat()
-						if err != nil {
-							log.Err(err).Msg("could not stat embedded CA cert")
-						}
-
-						// read bytes from file
-						b := make([]byte, s.Size())
-						n, err := f.Read(b)
-						if err != nil {
-							log.Err(err).Msg("could not read embedded CA cert")
-						}
-
-						// parse cert
-						p, _ := pem.Decode(b[:n])
-						c, err := x509.ParseCertificate(p.Bytes)
-						if err != nil {
-							log.Err(err).Msg("could not parse embedded CA cert")
-						}
-
-						// add cert to system cert pool
-						scp.AddCert(c)
-					}()
 				}
 
 				// TODO: fix this
@@ -102,7 +109,6 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				vo.DNSName = remoteHost
 				_, err = cert.Verify(vo)
 				if err != nil {
-					log.Err(err).Caller().Msg("could not verify server cert")
 					return err
 				}
 			}
@@ -114,6 +120,10 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 	scp, err := x509.SystemCertPool()
 	if err != nil {
 		log.Err(err).Caller().Msg("could not use system cert pool")
+		return c, err
+	}
+	err = addEmbeddedCertsToCertPool(scp)
+	if err != nil {
 		return c, err
 	}
 
