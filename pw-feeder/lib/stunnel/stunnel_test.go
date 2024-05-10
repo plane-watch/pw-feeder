@@ -33,6 +33,42 @@ func init() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.UnixDate})
 }
 
+func TestCACerts(t *testing.T) {
+
+	// get list of files in caCertPEMs embed.FS
+	pemFiles, err := caCertPEMs.ReadDir(".")
+	require.NoError(t, err)
+
+	// for each file...
+	for _, pemFile := range pemFiles {
+		t.Run(pemFile.Name(), func(t *testing.T) {
+
+			// open file
+			f, err := caCertPEMs.Open(pemFile.Name())
+			require.NoError(t, err)
+			defer f.Close()
+
+			// get file stat (for size)
+			s, err := f.Stat()
+			require.NoError(t, err)
+
+			// read bytes from file
+			b := make([]byte, s.Size())
+			n, err := f.Read(b)
+			require.NoError(t, err)
+
+			// parse cert
+			p, _ := pem.Decode(b[:n])
+			c, err := x509.ParseCertificate(p.Bytes)
+			require.NoError(t, err)
+
+			// check validity
+			assert.True(t, c.NotBefore.Before(time.Now()), "Certificate not yet valid")
+			assert.False(t, c.NotAfter.Before(time.Now()), "Certificate expired")
+		})
+	}
+}
+
 func GenerateSelfSignedTLSCertAndKey(keyFile, certFile *os.File) error {
 	// Thanks to: https://go.dev/src/crypto/tls/generate_cert.go
 
