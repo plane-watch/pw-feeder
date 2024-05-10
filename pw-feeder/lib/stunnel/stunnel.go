@@ -3,12 +3,62 @@ package stunnel
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"net"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
+
+func addEmbeddedCertsToCertPool(scp *x509.CertPool) error {
+	// load embedded Let's Encrypt CAs
+	// get list of files in caCertPEMs embed.FS
+	pemFiles, err := caCertPEMs.ReadDir(".")
+	if err != nil {
+		return err
+	}
+
+	// for each file...
+	for _, pemFile := range pemFiles {
+
+		func() {
+
+			log := log.With().Str("cafile", pemFile.Name()).Logger()
+
+			// open file
+			f, err := caCertPEMs.Open(pemFile.Name())
+			if err != nil {
+				log.Err(err).Msg("could not open embedded CA cert")
+			}
+			defer f.Close()
+
+			// get file stat (for size)
+			s, err := f.Stat()
+			if err != nil {
+				log.Err(err).Msg("could not stat embedded CA cert")
+			}
+
+			// read bytes from file
+			b := make([]byte, s.Size())
+			n, err := f.Read(b)
+			if err != nil {
+				log.Err(err).Msg("could not read embedded CA cert")
+			}
+
+			// parse cert
+			p, _ := pem.Decode(b[:n])
+			c, err := x509.ParseCertificate(p.Bytes)
+			if err != nil {
+				log.Err(err).Msg("could not parse embedded CA cert")
+			}
+
+			// add cert to system cert pool
+			scp.AddCert(c)
+		}()
+	}
+	return nil
+}
 
 func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 
@@ -40,10 +90,14 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 					return err
 				}
 
-				// load root CAs
+				// load system cert pool CAs
 				scp, err := x509.SystemCertPool()
 				if err != nil {
 					log.Err(err).Caller().Msg("could not use system cert pool")
+					return err
+				}
+				err = addEmbeddedCertsToCertPool(scp)
+				if err != nil {
 					return err
 				}
 
@@ -55,7 +109,6 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				vo.DNSName = remoteHost
 				_, err = cert.Verify(vo)
 				if err != nil {
-					log.Err(err).Caller().Msg("could not verify server cert")
 					return err
 				}
 			}
@@ -66,7 +119,11 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 	// load root CAs
 	scp, err := x509.SystemCertPool()
 	if err != nil {
-		log.Err(err).Caller().Msg("could not use system cert pool")
+		// log.Err(err).Caller().Msg("could not use system cert pool")
+		return c, err
+	}
+	err = addEmbeddedCertsToCertPool(scp)
+	if err != nil {
 		return c, err
 	}
 
@@ -85,18 +142,18 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 	// dial remote
 	c, err = tls.DialWithDialer(&d, "tcp", addr, &tlsConfig)
 	if err != nil {
-		log.Err(err).Caller().Msg("could not connect")
+		// log.Err(err).Caller().Msg("could not connect")
 		return c, err
 	}
 
 	// perform handshake
 	err = c.Handshake()
 	if err != nil {
-		log.Err(err).Caller().Msg("handshake error")
+		// log.Err(err).Caller().Msg("handshake error")
 		return c, err
 	}
 
-	log.Debug().Msg("endpoint connected")
+	// log.Debug().Msg("endpoint connected")
 	return c, err
 
 }

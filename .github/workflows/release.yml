@@ -16,6 +16,10 @@ jobs:
         run: |
           cd pw-feeder
           go mod tidy
+      - name: "go generate"
+        run: |
+          cd pw-feeder
+          go generate ./...
       - name: "go test"
         run: |
           cd pw-feeder
@@ -40,6 +44,10 @@ jobs:
       run: |
         cd pw-feeder
         go mod tidy
+    - name: "go generate"
+      run: |
+        cd pw-feeder
+        go generate ./...
     - name: "go build"
       run: |
         cd pw-feeder

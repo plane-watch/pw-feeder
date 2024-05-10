@@ -23,8 +23,9 @@ import (
 var (
 	app = &cli.App{
 		Name:        "pw-feeder",
+		Usage:       "feed ADS-B data to plane.watch",
 		Description: `Plane Watch Feeder Client`,
-		Version:     "0.0.2",
+		Version:     "0.0.3",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "apikey",
