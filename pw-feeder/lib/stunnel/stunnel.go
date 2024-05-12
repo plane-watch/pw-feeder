@@ -3,6 +3,7 @@ package stunnel
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"net"
 	"strings"
 	"time"
@@ -44,6 +45,10 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 				scp, err := x509.SystemCertPool()
 				if err != nil {
 					log.Err(err).Caller().Msg("could not use system cert pool")
+					return err
+				}
+				err = addEmbeddedCertsToCertPool(scp)
+				if err != nil {
 					return err
 				}
 
