@@ -35,7 +35,7 @@ If you receive an error `x509: certificate signed by unknown authority` when `pw
 We provide a helper script to do this on Debian and Ubuntu flavours of Linux. This script can be execute with the following command:
 
 ```bash
-curl https://raw.githubusercontent.com/plane-watch/pw-feeder/remove_embedded_ca/install_ca_certs.sh | bash
+curl https://raw.githubusercontent.com/plane-watch/pw-feeder/main/install_ca_certs.sh | bash
 ```
 
 The script uses `sudo`, so you will be prompted to enter your password. If you'd prefer to do this manually, the commands are shown and explained below.
