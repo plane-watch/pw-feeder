@@ -19,7 +19,7 @@ sudo curl -o lets-encrypt-e2.crt https://letsencrypt.org/certs/lets-encrypt-e2.p
 sudo curl -o lets-encrypt-r3.crt https://letsencrypt.org/certs/lets-encrypt-r3.pem
 sudo curl -o lets-encrypt-r4.crt https://letsencrypt.org/certs/lets-encrypt-r4.pem
 pushd /usr/share/ca-certificates
-find letsencrypt/ -type f -iname '*.crt' | sudo tee -a /etc/ca-certificates.conf
+find letsencrypt/ -maxdepth 1 -type f -iname '*.crt' | sudo tee -a /etc/ca-certificates.conf
 popd
 popd
 sudo update-ca-certificates
