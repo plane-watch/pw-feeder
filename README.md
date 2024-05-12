@@ -55,5 +55,5 @@ To do this on most Linux distributions, you can run the following commands:
 | `sudo curl -o lets-encrypt-r3.crt https://letsencrypt.org/certs/lets-encrypt-r3.pem` | Download the **Let’s Encrypt R3** certificate                                             |
 | `sudo curl -o lets-encrypt-r4.crt https://letsencrypt.org/certs/lets-encrypt-r4.pem` | Download the **Let’s Encrypt R4** certificate                                             |
 | `cd /usr/share/ca-certificates`                                                      | Change into the directory `/usr/share/ca-certificates`                                    |
-| `find letsencrypt/ -type f -iname '*.crt' >> /etc/ca-certificates.conf`              | Append the newly downloaded certificates to `/etc/ca-certificates.conf`                   |
+| `find letsencrypt/ -type f -iname '*.crt' \| sudo tee -a /etc/ca-certificates.conf`  | Append the newly downloaded certificates to `/etc/ca-certificates.conf`                   |
 | `sudo update-ca-certificates`                                                        | Regenerates ca-certificates.crt, a concatenated single-file list of CA certificates.      |
