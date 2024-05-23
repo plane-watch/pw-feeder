@@ -3,7 +3,7 @@ module pw-feeder
 go 1.19
 
 require (
-	github.com/rs/zerolog v1.32.0
+	github.com/rs/zerolog v1.33.0
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.2
 	golang.org/x/net v0.25.0
