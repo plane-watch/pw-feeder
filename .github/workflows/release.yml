@@ -12,6 +12,9 @@ jobs:
     name: Codecov
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '>=1.25.0'
       - name: "go mod tidy"
         run: |
           cd pw-feeder
