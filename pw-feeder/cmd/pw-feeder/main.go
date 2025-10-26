@@ -25,7 +25,7 @@ var (
 		Name:        "pw-feeder",
 		Usage:       "feed ADS-B data to plane.watch",
 		Description: `Plane Watch Feeder Client`,
-		Version:     "0.0.4",
+		Version:     "0.0.5",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "apikey",
@@ -101,7 +101,7 @@ func commithash() string {
 			}
 		}
 	}
-	return ""
+	return "unknown"
 }
 
 func main() {
@@ -135,7 +135,7 @@ func main() {
 
 func runFeeder(cliContext *cli.Context) error {
 	log.Info().
-		//Str("commithash", commithash()[:7]).
+		Str("commithash", commithash()[:7]).
 		Str("version", app.Version).
 		Msg("plane.watch feeder started")
 
@@ -158,16 +158,16 @@ func runFeeder(cliContext *cli.Context) error {
 		cancel()
 		return err
 	}
-	defer listenMLAT.Close()
+	defer func() {
+		_ = listenMLAT.Close()
+	}()
 
 	// prep signal handler
 	sigTermChan := make(chan os.Signal)
 	signal.Notify(sigTermChan, syscall.SIGTERM)
 
 	// start beast tunnel
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		connproxy.ProxyBEASTConnection(
 			ctx,
 			"BEAST",
@@ -176,12 +176,10 @@ func runFeeder(cliContext *cli.Context) error {
 			cliContext.String("apikey"),
 			cliContext.Bool("insecure"),
 		)
-	}()
+	})
 
 	// start MLAT tunnel
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		connproxy.ProxyMLATConnection(
 			ctx,
 			"MLAT",
@@ -190,19 +188,17 @@ func runFeeder(cliContext *cli.Context) error {
 			cliContext.String("apikey"),
 			cliContext.Bool("insecure"),
 		)
-	}()
+	})
 
 	// start status updater
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		atc_status.Start(
 			ctx,
 			cliContext.String("atcurl"),
 			cliContext.String("apikey"),
 			300,
 		)
-	}()
+	})
 
 	// wait for sigterm
 	_ = <-sigTermChan

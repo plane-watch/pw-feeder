@@ -25,7 +25,9 @@ func connHandlerEcho(t *testing.T, conn net.Conn) {
 		sendRecvBufferSize = 256 * 1024 // 256kB
 	)
 
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	buf := make([]byte, sendRecvBufferSize)
 	for {
@@ -52,7 +54,9 @@ func connHandlerChan(t *testing.T, conn net.Conn, dataIn, dataOut chan []byte) {
 		sendRecvBufferSize = 256 * 1024 // 256kB
 	)
 
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	bufOut := make([]byte, sendRecvBufferSize)
 
@@ -116,15 +120,25 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 
 	// PEM Encode CA cert
 	caPEM = new(bytes.Buffer)
-	pem.Encode(caPEM, &pem.Block{
+	err = pem.Encode(caPEM, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: caBytes,
 	})
+	if err != nil {
+		t.Log("Error encoding CA certificate for testing")
+		t.Error(err)
+		return certPEM, certPrivKeyPEM, caPEM, err
+	}
 	caPrivKeyPEM := new(bytes.Buffer)
-	pem.Encode(caPrivKeyPEM, &pem.Block{
+	err = pem.Encode(caPrivKeyPEM, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(caPrivKey),
 	})
+	if err != nil {
+		t.Log("Error encoding CA certificate private key for testing")
+		t.Error(err)
+		return certPEM, certPrivKeyPEM, caPEM, err
+	}
 
 	// prep server cert
 	cert := &x509.Certificate{
@@ -163,15 +177,25 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 
 	// PEM Encode server cert
 	certPEM = new(bytes.Buffer)
-	pem.Encode(certPEM, &pem.Block{
+	err = pem.Encode(certPEM, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
 	})
+	if err != nil {
+		t.Log("Error encoding server certificate for testing")
+		t.Error(err)
+		return certPEM, certPrivKeyPEM, caPEM, err
+	}
 	certPrivKeyPEM = new(bytes.Buffer)
-	pem.Encode(certPrivKeyPEM, &pem.Block{
+	err = pem.Encode(certPrivKeyPEM, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
 	})
+	if err != nil {
+		t.Log("Error encoding server certificate private key for testing")
+		t.Error(err)
+		return certPEM, certPrivKeyPEM, caPEM, err
+	}
 
 	return certPEM, certPrivKeyPEM, caPEM, err
 }
@@ -211,7 +235,9 @@ func startTLSServer(t *testing.T, wg *sync.WaitGroup, addr string) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer tlsListener.Close()
+	defer func() {
+		_ = tlsListener.Close()
+	}()
 
 	wg.Done()
 
@@ -221,7 +247,10 @@ func startTLSServer(t *testing.T, wg *sync.WaitGroup, addr string) {
 		if err != nil {
 			break
 		}
-		defer c.Close()
+		defer func() {
+			_ = c.Close()
+		}()
+
 		go connHandlerEcho(t, c)
 	}
 }
@@ -238,7 +267,9 @@ func startTCPServer(t *testing.T, wg *sync.WaitGroup, addr string, dataIn, dataO
 	if err != nil {
 		t.Error(err)
 	}
-	defer listener.Close()
+	defer func() {
+		_ = listener.Close()
+	}()
 
 	wg.Done()
 
@@ -248,7 +279,10 @@ func startTCPServer(t *testing.T, wg *sync.WaitGroup, addr string, dataIn, dataO
 		if err != nil {
 			break
 		}
-		defer c.Close()
+		defer func() {
+			_ = c.Close()
+		}()
+
 		go connHandlerChan(t, c, dataIn, dataOut)
 	}
 }
@@ -268,7 +302,9 @@ func startTCPClient(t *testing.T, addr string, dataIn, dataOut chan []byte) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer c.Close()
+	defer func() {
+		_ = c.Close()
+	}()
 
 	for {
 		_, err := c.Write(<-dataIn)
