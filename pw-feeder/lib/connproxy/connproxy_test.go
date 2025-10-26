@@ -39,11 +39,9 @@ func TestLogStats(t *testing.T) {
 	ts.incrementByteCounter(1, 2, 3, 4)
 	wg := sync.WaitGroup{}
 	testCtx, testCancel := context.WithCancel(context.Background())
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		logStats(testCtx, &ts, "Test Protocol", time.Second)
-	}()
+	})
 	time.Sleep(time.Second * 5)
 	testCancel()
 	wg.Wait()
@@ -51,11 +49,11 @@ func TestLogStats(t *testing.T) {
 
 func TestDataMover(t *testing.T) {
 
-	log := log.With().Caller().Logger()
+	logger := log.With().Caller().Logger()
 
 	testBytes := []byte("Hello World! 1234567890")
 
-	t.Run("NettoTLS working", func(t *testing.T) {
+	t.Run("Net to TLS working", func(t *testing.T) {
 		connAIn, connAOut := net.Pipe()
 		connBIn, connBOut := net.Pipe()
 
@@ -65,28 +63,22 @@ func TestDataMover(t *testing.T) {
 		wg := sync.WaitGroup{}
 		waitRead := make(chan bool)
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			dataMoverNettoTLS(ctx, connAOut, connBIn, &ts, log)
-		}()
+		wg.Go(func() {
+			dataMoverNettoTLS(ctx, connAOut, connBIn, &ts, logger)
+		})
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := connAIn.Write(testBytes)
 			require.NoError(t, err)
-		}()
+		})
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			b := make([]byte, 1000)
 			n, err := connBOut.Read(b)
 			require.NoError(t, err)
 			assert.Equal(t, testBytes, b[:n])
 			waitRead <- true
-		}()
+		})
 
 		// wait for read to complete
 		_ = <-waitRead
@@ -110,11 +102,9 @@ func TestDataMover(t *testing.T) {
 		ts := tunnelStats{}
 		wg := sync.WaitGroup{}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			dataMoverNettoTLS(ctx, connAOut, connBIn, &ts, log)
-		}()
+		wg.Go(func() {
+			dataMoverNettoTLS(ctx, connAOut, connBIn, &ts, logger)
+		})
 
 		// context cancel
 		cancel()
@@ -129,7 +119,7 @@ func TestDataMover(t *testing.T) {
 		wg.Wait()
 	})
 
-	t.Run("TLStoNet context cancel", func(t *testing.T) {
+	t.Run("TLS to Net context cancel", func(t *testing.T) {
 		connAIn, connAOut := net.Pipe()
 		connBIn, connBOut := net.Pipe()
 
@@ -138,11 +128,9 @@ func TestDataMover(t *testing.T) {
 		ts := tunnelStats{}
 		wg := sync.WaitGroup{}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			dataMoverTLStoNet(ctx, connAOut, connBIn, &ts, log)
-		}()
+		wg.Go(func() {
+			dataMoverTLStoNet(ctx, connAOut, connBIn, &ts, logger)
+		})
 
 		// context cancel
 		cancel()
@@ -157,7 +145,7 @@ func TestDataMover(t *testing.T) {
 		wg.Wait()
 	})
 
-	t.Run("TLStoNet working", func(t *testing.T) {
+	t.Run("TLS to Net working", func(t *testing.T) {
 		connAIn, connAOut := net.Pipe()
 		connBIn, connBOut := net.Pipe()
 
@@ -167,28 +155,22 @@ func TestDataMover(t *testing.T) {
 		wg := sync.WaitGroup{}
 		waitRead := make(chan bool)
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			dataMoverTLStoNet(ctx, connAOut, connBIn, &ts, log)
-		}()
+		wg.Go(func() {
+			dataMoverTLStoNet(ctx, connAOut, connBIn, &ts, logger)
+		})
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := connAIn.Write(testBytes)
 			require.NoError(t, err)
-		}()
+		})
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			b := make([]byte, 1000)
 			n, err := connBOut.Read(b)
 			require.NoError(t, err)
 			assert.Equal(t, testBytes, b[:n])
 			waitRead <- true
-		}()
+		})
 
 		// wait for read to complete
 		_ = <-waitRead
@@ -210,31 +192,25 @@ func TestDataMover(t *testing.T) {
 		wg := sync.WaitGroup{}
 		waitRead := make(chan bool)
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			bytesRead, bytesWritten, err := dataMover(connAOut, connBIn, log)
+		wg.Go(func() {
+			bytesRead, bytesWritten, err := dataMover(connAOut, connBIn, logger)
 			require.NoError(t, err)
 			assert.Equal(t, len(testBytes), bytesRead)
 			assert.Equal(t, len(testBytes), bytesWritten)
-		}()
+		})
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := connAIn.Write(testBytes)
 			require.NoError(t, err)
-		}()
+		})
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			b := make([]byte, 1000)
 			n, err := connBOut.Read(b)
 			require.NoError(t, err)
 			assert.Equal(t, testBytes, b[:n])
 			waitRead <- true
-		}()
+		})
 
 		// wait for read to complete
 		_ = <-waitRead
@@ -255,21 +231,17 @@ func TestDataMover(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, _, err := dataMover(connAOut, connBIn, log)
+		wg.Go(func() {
+			_, _, err := dataMover(connAOut, connBIn, logger)
 			require.Error(t, err)
-		}()
+		})
 
 		// introduce write error
-		connBIn.Close()
+		_ = connBIn.Close()
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			connAIn.Write(testBytes)
-		}()
+		wg.Go(func() {
+			_, _ = connAIn.Write(testBytes)
+		})
 
 		// wait for everything to finish
 		wg.Wait()
@@ -287,21 +259,20 @@ func TestProxyOutboundConnection(t *testing.T) {
 	testData := []byte("Test BEAST data! 1234567890")
 
 	// override func for testing
-	connectToPlaneWatch_original := connectToPlaneWatch
+	connectToPlaneWatchOriginal := connectToPlaneWatch
 	t.Cleanup(func() {
-		connectToPlaneWatch = connectToPlaneWatch_original
+		connectToPlaneWatch = connectToPlaneWatchOriginal
 	})
-	connectToPlaneWatch = func(name string, addr string, sni string) (c net.Conn, err error) {
+	connectToPlaneWatch = func(name, addr, sni string, insecure bool) (c net.Conn, err error) {
 		return net.Dial("tcp4", addr)
 	}
 
 	// override vars for testing
-	logStatsInterval_original := logStatsInterval
-	errSleepTime_original := errSleepTime
+	logStatsIntervalOriginal := logStatsInterval
+	errSleepTimeOriginal := errSleepTime
 	t.Cleanup(func() {
-		logStatsInterval = logStatsInterval_original
-		errSleepTime = errSleepTime_original
-
+		logStatsInterval = logStatsIntervalOriginal
+		errSleepTime = errSleepTimeOriginal
 	})
 	logStatsInterval = time.Second * 1
 	errSleepTime = time.Second * 1
@@ -311,39 +282,35 @@ func TestProxyOutboundConnection(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 
-		wg := sync.WaitGroup{}
-
 		// mock plane.watch server listener
 		nl, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
 
 		// close mock plane.watch server listener to induce error
-		nl.Close()
+		_ = nl.Close()
 
 		// mock beast provider listener
 		bp, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
+		defer func() {
+			_ = bp.Close()
+		}()
 
 		// start proxy
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
-		}()
+		wg := sync.WaitGroup{}
+		wg.Go(func() {
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
+		})
 
 		// wait for a connection attempt
 		t.Log("wait for a connection attempt")
 		time.Sleep(time.Second * 10)
 
-		// cancel context
+		// shut 'er d
 		cancel()
 
 		// wait for goroutines
 		wg.Wait()
-
-		// close listeners
-		bp.Close()
-
 	})
 
 	t.Run("cannot connect to local endpoint", func(t *testing.T) {
@@ -356,34 +323,32 @@ func TestProxyOutboundConnection(t *testing.T) {
 		// mock plane.watch server listener
 		nl, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
+		defer func() {
+			_ = nl.Close()
+		}()
 
 		// mock plane.watch server
 		// accepts one connection, reads data, replies with the same data, closes the connection
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			t.Logf("mock plane.watch server listening on: %s", nl.Addr().String())
-			nl.(*net.TCPListener).SetDeadline(time.Now().Add(time.Second * 5))
+			_ = nl.(*net.TCPListener).SetDeadline(time.Now().Add(time.Second * 5))
 			c, err := nl.Accept()
 			if err == nil {
-				c.Close()
+				_ = c.Close()
 			}
-		}(t)
+		})
 
 		// mock beast provider listener
 		bp, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
 
 		// close beast provider to induce error
-		bp.Close()
+		_ = bp.Close()
 
 		// start proxy
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
-		}()
+		wg.Go(func() {
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
+		})
 
 		// wait for a connection attempt
 		t.Log("wait for a connection attempt")
@@ -394,10 +359,6 @@ func TestProxyOutboundConnection(t *testing.T) {
 
 		// wait for goroutines
 		wg.Wait()
-
-		// close listeners
-		nl.Close()
-
 	})
 
 	t.Run("working", func(t *testing.T) {
@@ -412,12 +373,13 @@ func TestProxyOutboundConnection(t *testing.T) {
 		// mock plane.watch server listener
 		nl, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
+		defer func() {
+			_ = nl.Close()
+		}()
 
 		// mock plane.watch server
 		// accepts one connection, reads data, replies with the same data, closes the connection
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			buf := make([]byte, 1000)
 
 			t.Logf("mock plane.watch server listening on: %s", nl.Addr().String())
@@ -441,17 +403,18 @@ func TestProxyOutboundConnection(t *testing.T) {
 			t.Log("mock plane.watch server closed connection")
 
 			finishChan <- true
-		}(t)
+		})
 
 		// mock beast provider listener
 		bp, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
+		defer func() {
+			_ = bp.Close()
+		}()
 
 		// mock beast provider
 		// accepts one connection, writes data, reads reply, closes the connection
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			buf := make([]byte, 1000)
 
 			t.Logf("mock beast provider listening on: %s", bp.Addr().String())
@@ -475,14 +438,12 @@ func TestProxyOutboundConnection(t *testing.T) {
 			t.Log("mock beast provider closed connection")
 
 			finishChan <- true
-		}(t)
+		})
 
 		// start proxy
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
-		}()
+		wg.Go(func() {
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
+		})
 
 		// wait for data transfers
 		_ = <-finishChan
@@ -493,11 +454,6 @@ func TestProxyOutboundConnection(t *testing.T) {
 
 		// wait for goroutines
 		wg.Wait()
-
-		// close listeners
-		nl.Close()
-		bp.Close()
-
 	})
 
 	t.Run("context cancel", func(t *testing.T) {
@@ -512,13 +468,13 @@ func TestProxyOutboundConnection(t *testing.T) {
 		// mock plane.watch server listener
 		nl, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
+		defer func() {
+			_ = nl.Close()
+		}()
 
 		// mock plane.watch server
 		// accepts one connection, reads data, replies with the same data, closes the connection
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			t.Logf("mock plane.watch server listening on: %s", nl.Addr().String())
 			c, err := nl.Accept()
 			require.NoError(t, err, "mock plane.watch server accepting connection")
@@ -530,18 +486,18 @@ func TestProxyOutboundConnection(t *testing.T) {
 			require.NoError(t, err, "mock plane.watch server closing connection")
 			t.Log("mock plane.watch server closed connection")
 
-		}(t)
+		})
 
 		// mock beast provider listener
 		bp, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
+		defer func() {
+			_ = bp.Close()
+		}()
 
 		// mock beast provider
 		// accepts one connection, writes data, reads reply, closes the connection
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			t.Logf("mock beast provider listening on: %s", bp.Addr().String())
 			c, err := bp.Accept()
 			require.NoError(t, err, "mock beast provider accepting connection")
@@ -552,17 +508,15 @@ func TestProxyOutboundConnection(t *testing.T) {
 			err = c.Close()
 			require.NoError(t, err, "mock beast provider closing connection")
 			t.Log("mock beast provider closed connection")
-		}(t)
+		})
 
 		// start proxy
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
+		wg.Go(func() {
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
 			t.Log("ProxyOutboundConnection done")
 			finishChan <- true
 			finishChan <- true
-		}()
+		})
 
 		// wait for connections
 		t.Log("sleeping for a bit")
@@ -575,10 +529,6 @@ func TestProxyOutboundConnection(t *testing.T) {
 		// wait for goroutines
 		t.Log("waiting for goroutines")
 		wg.Wait()
-
-		// close listeners
-		nl.Close()
-		bp.Close()
 	})
 
 	t.Run("terminate tunnel", func(t *testing.T) {
@@ -593,13 +543,13 @@ func TestProxyOutboundConnection(t *testing.T) {
 		// mock plane.watch server listener
 		nl, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
+		defer func() {
+			_ = nl.Close()
+		}()
 
 		// mock plane.watch server
 		// accepts one connection, reads data, replies with the same data, closes the connection
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			t.Logf("mock plane.watch server listening on: %s", nl.Addr().String())
 			c, err := nl.Accept()
 			require.NoError(t, err, "mock plane.watch server accepting connection")
@@ -611,18 +561,18 @@ func TestProxyOutboundConnection(t *testing.T) {
 			require.NoError(t, err, "mock plane.watch server closing connection")
 			t.Log("mock plane.watch server closed connection")
 
-		}(t)
+		})
 
 		// mock beast provider listener
 		bp, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
+		defer func() {
+			_ = bp.Close()
+		}()
 
 		// mock beast provider
 		// accepts one connection, writes data, reads reply, closes the connection
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			t.Logf("mock beast provider listening on: %s", bp.Addr().String())
 			c, err := bp.Accept()
 			require.NoError(t, err, "mock beast provider accepting connection")
@@ -633,15 +583,13 @@ func TestProxyOutboundConnection(t *testing.T) {
 			err = c.Close()
 			require.NoError(t, err, "mock beast provider closing connection")
 			t.Log("mock beast provider closed connection")
-		}(t)
+		})
 
 		// start proxy
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String())
+		wg.Go(func() {
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
 			t.Log("ProxyOutboundConnection done")
-		}()
+		})
 
 		// wait for connections
 		t.Log("sleeping for a bit")
@@ -662,10 +610,6 @@ func TestProxyOutboundConnection(t *testing.T) {
 		// wait for goroutines
 		t.Log("waiting for goroutines")
 		wg.Wait()
-
-		// close listeners
-		nl.Close()
-		bp.Close()
 	})
 
 }
@@ -675,21 +619,20 @@ func TestProxyInboundConnection(t *testing.T) {
 	testData := []byte("Test MLAT data! 1234567890")
 
 	// override func for testing
-	connectToPlaneWatch_original := connectToPlaneWatch
+	connectToPlaneWatchOriginal := connectToPlaneWatch
 	t.Cleanup(func() {
-		connectToPlaneWatch = connectToPlaneWatch_original
+		connectToPlaneWatch = connectToPlaneWatchOriginal
 	})
-	connectToPlaneWatch = func(name string, addr string, sni string) (c net.Conn, err error) {
+	connectToPlaneWatch = func(name, addr, sni string, insecure bool) (c net.Conn, err error) {
 		return net.DialTimeout("tcp4", addr, time.Second*10)
 	}
 
 	// override vars for testing
-	logStatsInterval_original := logStatsInterval
-	errSleepTime_original := errSleepTime
+	logStatsIntervalOriginal := logStatsInterval
+	errSleepTimeOriginal := errSleepTime
 	t.Cleanup(func() {
-		logStatsInterval = logStatsInterval_original
-		errSleepTime = errSleepTime_original
-
+		logStatsInterval = logStatsIntervalOriginal
+		errSleepTime = errSleepTimeOriginal
 	})
 	logStatsInterval = time.Second * 1
 	errSleepTime = time.Second * 1
@@ -704,22 +647,24 @@ func TestProxyInboundConnection(t *testing.T) {
 		// mock plane.watch server listener
 		nl, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
-		defer nl.Close()
+		defer func() {
+			_ = nl.Close()
+		}()
 
 		// mock mlat provider listener
 		mp, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
-		defer mp.Close()
+		defer func() {
+			_ = mp.Close()
+		}()
 
 		// close listener to induce error
-		mp.Close()
+		_ = mp.Close()
 
 		// start proxy
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
-		}(t)
+		wg.Go(func() {
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false)
+		})
 
 		// wait for connection attempts
 		time.Sleep(time.Second * 1)
@@ -744,35 +689,33 @@ func TestProxyInboundConnection(t *testing.T) {
 		// mock plane.watch server listener
 		nl, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
-		defer nl.Close()
+		defer func() {
+			_ = nl.Close()
+		}()
 
 		// close mock plane.watch server listener to induce error
-		nl.Close()
+		_ = nl.Close()
 
 		// mlat listener
 		mp, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
-		defer mp.Close()
+		defer func() {
+			_ = mp.Close()
+		}()
 
 		// start proxy
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
-		}(t)
+		wg.Go(func() {
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false)
+		})
 
 		// mock mlat-client
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			// connect
-			net.Dial("tcp4", mp.Addr().String())
+			_, _ = net.Dial("tcp4", mp.Addr().String())
 
 			// wait for tests
 			<-stopChan
-
-		}(t)
+		})
 
 		// wait for connection attempts
 		time.Sleep(time.Second * 1)
@@ -798,13 +741,13 @@ func TestProxyInboundConnection(t *testing.T) {
 		// mock plane.watch server listener
 		nl, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
-		defer nl.Close()
+		defer func() {
+			_ = nl.Close()
+		}()
 
 		// mock plane.watch server
 		// accepts one connection, reads data, replies with the same data, closes the connection
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			buf := make([]byte, 1000)
 
 			t.Logf("mock plane.watch server listening on: %s", nl.Addr().String())
@@ -828,24 +771,22 @@ func TestProxyInboundConnection(t *testing.T) {
 			t.Log("mock plane.watch server closed connection")
 
 			finishChan <- true
-		}(t)
+		})
 
 		// mlat listener
 		mp, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
-		defer mp.Close()
+		defer func() {
+			_ = mp.Close()
+		}()
 
 		// start proxy
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
-		}(t)
+		wg.Go(func() {
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false)
+		})
 
 		// mock mlat-client
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			buf := make([]byte, 1000)
 
 			// connect
@@ -868,7 +809,7 @@ func TestProxyInboundConnection(t *testing.T) {
 			require.NoError(t, err, "mock mlat-client closing connection")
 
 			finishChan <- true
-		}(t)
+		})
 
 		// wait for connection attempts
 		time.Sleep(time.Second * 1)
@@ -882,8 +823,6 @@ func TestProxyInboundConnection(t *testing.T) {
 
 		// wait for goroutines
 		wg.Wait()
-
-		nl.Close()
 	})
 
 	t.Run("working with full loop", func(t *testing.T) {
@@ -898,12 +837,13 @@ func TestProxyInboundConnection(t *testing.T) {
 		// mock plane.watch server listener
 		nl, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
+		defer func() {
+			_ = nl.Close()
+		}()
 
 		// mock plane.watch server
 		// accepts one connection, reads data, replies with the same data, closes the connection
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			buf := make([]byte, 1000)
 
 			for i := 0; i <= 2; i++ {
@@ -931,24 +871,22 @@ func TestProxyInboundConnection(t *testing.T) {
 			}
 
 			finishChan <- true
-		}(t)
+		})
 
 		// mlat listener
 		mp, err := nettest.NewLocalListener("tcp4")
 		require.NoError(t, err)
-		defer mp.Close()
+		defer func() {
+			_ = mp.Close()
+		}()
 
 		// start proxy
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
-			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String())
-		}(t)
+		wg.Go(func() {
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false)
+		})
 
 		// mock mlat-client
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			buf := make([]byte, 1000)
 
 			for i := 0; i <= 2; i++ {
@@ -979,14 +917,14 @@ func TestProxyInboundConnection(t *testing.T) {
 			}
 
 			finishChan <- true
-		}(t)
+		})
 
 		// wait for tests
 		<-finishChan
 		<-finishChan
 
 		// close server
-		nl.Close()
+		_ = nl.Close()
 
 		// cancel context
 		cancel()
@@ -995,5 +933,4 @@ func TestProxyInboundConnection(t *testing.T) {
 		wg.Wait()
 
 	})
-
 }

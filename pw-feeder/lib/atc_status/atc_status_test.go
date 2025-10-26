@@ -87,11 +87,11 @@ func PrepMockATCServer(t *testing.T, testScenario int) *httptest.Server {
 			// response body
 			switch testScenario {
 			case MockServerTestScenarioInvalidJSON:
-				w.Write([]byte(resp)[2:])
+				_, _ = w.Write([]byte(resp)[2:])
 			case MockServerTestScenarioServerError:
 				return
 			default:
-				w.Write([]byte(resp))
+				_, _ = w.Write([]byte(resp))
 			}
 
 		default:
@@ -238,25 +238,22 @@ func TestStartStop(t *testing.T) {
 		randSeconds = 1
 
 		// prep parent context & waitgroup
-		testCtx, _ := context.WithTimeout(context.Background(), time.Second*30)
+		testCtx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
 		wg := sync.WaitGroup{}
 
 		// start
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60)
-		}(t)
+		})
 
 		// wait for some logging
 		time.Sleep(time.Second * 10)
 
 		// stop
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			Stop()
-		}(t)
+		})
 
 		// wait for everything to finish
 		wg.Wait()
@@ -277,25 +274,22 @@ func TestStartStop(t *testing.T) {
 		randSeconds = 1
 
 		// prep parent context & waitgroup
-		testCtx, _ := context.WithTimeout(context.Background(), time.Second*30)
+		testCtx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
 		wg := sync.WaitGroup{}
 
 		// start
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60)
-		}(t)
+		})
 
 		// wait for some logging
 		time.Sleep(time.Second * 10)
 
 		// stop
-		wg.Add(1)
-		go func(t *testing.T) {
-			defer wg.Done()
+		wg.Go(func() {
 			Stop()
-		}(t)
+		})
 
 		// wait for everything to finish
 		wg.Wait()

@@ -22,12 +22,16 @@ func TestConnectToHost(t *testing.T) {
 		// set up test listener
 		tl, err := nettest.NewLocalListener("tcp")
 		require.NoError(t, err)
-		defer tl.Close()
+		defer func() {
+			_ = tl.Close()
+		}()
 
 		// attempt to connect
 		c, err := ConnectToHost("test", tl.Addr().String())
 		require.NoError(t, err)
-		defer c.Close()
+		defer func() {
+			_ = c.Close()
+		}()
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -39,7 +43,7 @@ func TestConnectToHost(t *testing.T) {
 		testAddr := tl.Addr().String()
 
 		// close test listener (to induce error)
-		tl.Close()
+		_ = tl.Close()
 
 		// attempt to connect
 		_, err = ConnectToHost("test", testAddr)

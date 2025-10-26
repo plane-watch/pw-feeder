@@ -10,9 +10,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
+func Connect(name, addr, sni string, insecure bool) (c *tls.Conn, err error) {
 
-	log := log.With().Str("name", name).Str("addr", addr).Logger()
+	logger := log.With().Str("name", name).Str("addr", addr).Logger()
 
 	// split host/port from addr
 	remoteHost := strings.Split(addr, ":")[0]
@@ -26,28 +26,27 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 			// parse the cert
 			cert, err := x509.ParseCertificate(rawCert)
 			if err != nil {
-				log.Err(err).Msg("could not parse server cert")
+				logger.Err(err).Msg("could not parse server cert")
 				return err
 			}
 
 			// if the certificate is not a CA, then check it
-			if !cert.IsCA {
+			if !insecure && !cert.IsCA {
 
 				// ensure the certificate hostname matches the host we're trying to connect to
 				err := cert.VerifyHostname(remoteHost)
 				if err != nil {
-					log.Err(err).Str("host", remoteHost).Msg("could not verify server cert hostname")
+					logger.Err(err).Str("host", remoteHost).Msg("could not verify server cert hostname")
 					return err
 				}
 
 				// load system cert pool CAs
 				scp, err := x509.SystemCertPool()
 				if err != nil {
-					log.Err(err).Caller().Msg("could not use system cert pool")
+					logger.Err(err).Caller().Msg("could not use system cert pool")
 					return err
 				}
 
-				// TODO: fix this
 				// verify server cert
 				vo := x509.VerifyOptions{}
 				vo.Roots = scp

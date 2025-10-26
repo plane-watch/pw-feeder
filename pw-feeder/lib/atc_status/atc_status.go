@@ -51,7 +51,9 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 	}
 
 	// defer closure response body
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	// read response body
 	body, err := io.ReadAll(res.Body)

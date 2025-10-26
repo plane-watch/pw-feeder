@@ -41,7 +41,7 @@ func GenerateSelfSignedTLSCertAndKey(keyFile, certFile *os.File) error {
 	ipAddrs := []net.IP{net.IPv4(127, 0, 0, 1)}
 	notBefore := time.Now()
 	notAfter := time.Now().Add(time.Minute * 15)
-	isCA := true
+	//isCA := true
 
 	// generate private key
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
@@ -83,10 +83,10 @@ func GenerateSelfSignedTLSCertAndKey(keyFile, certFile *os.File) error {
 	}
 
 	// if self-signed, include CA
-	if isCA {
-		template.IsCA = true
-		template.KeyUsage |= x509.KeyUsageCertSign
-	}
+	//if isCA {
+	template.IsCA = true
+	template.KeyUsage |= x509.KeyUsageCertSign
+	//}
 
 	// create certificate
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, priv.Public().(ed25519.PublicKey), priv)
@@ -121,16 +121,16 @@ func TestStunnel(t *testing.T) {
 	certFile, err := os.CreateTemp("", "bordercontrol_unit_testing_*_cert.pem")
 	require.NoError(t, err, "prep cert file")
 	t.Cleanup(func() {
-		certFile.Close()
-		os.Remove(certFile.Name())
+		_ = certFile.Close()
+		_ = os.Remove(certFile.Name())
 	})
 
 	// prep key file
 	keyFile, err := os.CreateTemp("", "bordercontrol_unit_testing_*_key.pem")
 	require.NoError(t, err, "prep key file")
 	t.Cleanup(func() {
-		keyFile.Close()
-		os.Remove(keyFile.Name())
+		_ = keyFile.Close()
+		_ = os.Remove(keyFile.Name())
 	})
 
 	// generate cert/key for testing
@@ -157,9 +157,7 @@ func TestStunnel(t *testing.T) {
 	wgOuter := sync.WaitGroup{}
 
 	// launch listener accepter
-	wgOuter.Add(1)
-	go func(t *testing.T) {
-		defer wgOuter.Done()
+	wgOuter.Go(func() {
 
 		buf := make([]byte, 1000)
 
@@ -189,12 +187,12 @@ func TestStunnel(t *testing.T) {
 				_, err = c.Write(buf[:n])
 				require.NoError(t, err)
 
-				c.Close()
+				_ = c.Close()
 			}
 		}
-	}(t)
+	})
 
-	conn, err := StunnelConnect("TEST", listener.Addr().String(), testSNI.String())
+	conn, err := Connect("TEST", listener.Addr().String(), testSNI.String(), false)
 	require.NoError(t, err)
 
 	// test write
@@ -210,7 +208,7 @@ func TestStunnel(t *testing.T) {
 	assert.Equal(t, testData, buf[:n])
 
 	// close
-	conn.Close()
+	_ = conn.Close()
 
 	// clean up
 	testCancel()
@@ -218,23 +216,23 @@ func TestStunnel(t *testing.T) {
 
 }
 
-func TestStunnel_cantconnect(t *testing.T) {
+func TestStunnel_Error_CantConnect(t *testing.T) {
 
 	// get listener addr
 	listener, err := nettest.NewLocalListener("tcp4")
 	require.NoError(t, err)
 
 	// introduce error
-	listener.Close()
+	_ = listener.Close()
 
 	// test
-	_, err = StunnelConnect("TEST", listener.Addr().String(), testSNI.String())
+	_, err = Connect("TEST", listener.Addr().String(), testSNI.String(), false)
 	require.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "connection refused"))
 
 }
 
-func TestStunnel_tlserror(t *testing.T) {
+func TestStunnel_Error_TLSError(t *testing.T) {
 
 	// get listener addr
 	listener, err := nettest.NewLocalListener("tcp4")
@@ -246,9 +244,7 @@ func TestStunnel_tlserror(t *testing.T) {
 	wgOuter := sync.WaitGroup{}
 
 	// launch listener accepter
-	wgOuter.Add(1)
-	go func(t *testing.T) {
-		defer wgOuter.Done()
+	wgOuter.Go(func() {
 
 		buf := make([]byte, 1000)
 
@@ -275,13 +271,13 @@ func TestStunnel_tlserror(t *testing.T) {
 				_, err = c.Write(buf[:n])
 				require.NoError(t, err)
 
-				c.Close()
+				_ = c.Close()
 			}
 		}
-	}(t)
+	})
 
 	// test
-	_, err = StunnelConnect("TEST", listener.Addr().String(), testSNI.String())
+	_, err = Connect("TEST", listener.Addr().String(), testSNI.String(), false)
 	require.Error(t, err)
 
 	// clean up

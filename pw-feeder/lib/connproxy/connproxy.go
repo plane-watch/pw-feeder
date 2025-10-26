@@ -29,8 +29,8 @@ var (
 	errSleepTime     = time.Second * 10
 
 	// wrapper to stunnelConnect to allow overriding for testing
-	connectToPlaneWatch = func(name string, addr string, sni string) (c net.Conn, err error) {
-		return stunnel.StunnelConnect(name, addr, sni)
+	connectToPlaneWatch = func(name, addr, sni string, insecure bool) (c net.Conn, err error) {
+		return stunnel.Connect(name, addr, sni, insecure)
 	}
 )
 
@@ -131,19 +131,17 @@ func logStats(ctx context.Context, ts *tunnelStats, proto string, interval time.
 	}
 }
 
-func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint, apikey string) {
+func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint, apikey string, insecure bool) {
 
-	log := log.With().Str("src", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Logger()
+	logger := log.With().Str("src", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Logger()
 
 	outerWg := sync.WaitGroup{}
 
 	// log stats every 5 mins
 	ts := tunnelStats{}
-	outerWg.Add(1)
-	go func() {
-		defer outerWg.Done()
+	outerWg.Go(func() {
 		logStats(ctx, &ts, protoname, logStatsInterval)
-	}()
+	})
 
 	for {
 
@@ -152,35 +150,35 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		// if context closure
 		select {
 		case _ = <-ctx.Done():
-			log.Debug().Msg("stopping")
+			logger.Debug().Msg("stopping")
 			outerWg.Wait()
 			return
 		default:
 		}
 
-		log.Info().Msg("initiating connection to BEAST provider")
+		logger.Info().Msg("initiating connection to BEAST provider")
 
 		// connect local end point (lc = local connection)
 		lc, err := network.ConnectToHost(protoname, localaddr)
 		if err != nil {
-			log.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running and listening on the specified port")
+			logger.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running and listening on the specified port")
 			time.Sleep(errSleepTime)
 			continue
 		}
 
-		log.Info().Msg("initiating tunnel connection to plane.watch")
+		logger.Info().Msg("initiating tunnel connection to plane.watch")
 
 		// connect plane.watch endpoint (pwc = plane.watch connection)
-		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey)
+		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey, insecure)
 		if err != nil {
-			log.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection")
-			lc.Close()
+			logger.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection")
+			_ = lc.Close()
 			time.Sleep(errSleepTime)
 			continue
 		}
 
 		// update user
-		log.Info().Msg("feeding BEAST data to plane.watch")
+		logger.Info().Msg("feeding BEAST data to plane.watch")
 
 		// start tunneling data
 		// This will block until there is an error or the connection is closed
@@ -188,19 +186,15 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		// prep context for data movers
 		dataMoverCtx, dataMoverCancel := context.WithCancel(ctx)
 
-		innerWg.Add(1)
-		go func() {
-			defer innerWg.Done()
+		innerWg.Go(func() {
 			defer dataMoverCancel()
-			dataMoverNettoTLS(dataMoverCtx, lc, pwc, &ts, log)
-		}()
+			dataMoverNettoTLS(dataMoverCtx, lc, pwc, &ts, logger)
+		})
 
-		innerWg.Add(1)
-		go func() {
-			defer innerWg.Done()
+		innerWg.Go(func() {
 			defer dataMoverCancel()
-			dataMoverTLStoNet(dataMoverCtx, pwc, lc, &ts, log)
-		}()
+			dataMoverTLStoNet(dataMoverCtx, pwc, lc, &ts, logger)
+		})
 
 		// chan for waitgroup
 		wgChan := make(chan bool)
@@ -212,9 +206,9 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		select {
 		// if context closure, exit
 		case <-ctx.Done():
-			log.Debug().Msg("stopping")
-			pwc.Close()
-			lc.Close()
+			logger.Debug().Msg("stopping")
+			_ = pwc.Close()
+			_ = lc.Close()
 			innerWg.Wait()
 			outerWg.Wait()
 			return
@@ -222,28 +216,26 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		// wait for goroutines to finish
 		case <-wgChan:
 			// close connections
-			lc.Close()
-			pwc.Close()
+			_ = lc.Close()
+			_ = pwc.Close()
 			// let user know
-			log.Warn().Msg("tunnel to plane.watch has been terminated")
+			logger.Warn().Msg("tunnel to plane.watch has been terminated")
 		}
 	}
 }
 
-func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Listener, pwendpoint, apikey string) {
+func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Listener, pwendpoint, apikey string, insecure bool) {
 
-	log := log.With().Str("listen", listener.Addr().String()).Str("dst", pwendpoint).Str("proto", protoname).Logger()
-	log.Info().Msg("listening for connections from mlat-client")
+	logger := log.With().Str("listen", listener.Addr().String()).Str("dst", pwendpoint).Str("proto", protoname).Logger()
+	logger.Info().Msg("listening for connections from mlat-client")
 
 	outerWg := sync.WaitGroup{}
 
 	// log stats every 5 mins
 	ts := tunnelStats{}
-	outerWg.Add(1)
-	go func() {
-		defer outerWg.Done()
+	outerWg.Go(func() {
 		logStats(ctx, &ts, protoname, logStatsInterval)
-	}()
+	})
 
 	for {
 
@@ -252,7 +244,7 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		// if context closure
 		select {
 		case _ = <-ctx.Done():
-			log.Debug().Msg("stopping")
+			logger.Debug().Msg("stopping")
 			outerWg.Wait()
 			return
 		default:
@@ -261,7 +253,7 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		// wait for local connection with deadline
 		err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(time.Second * 1))
 		if err != nil {
-			log.Err(err).Msg("Error setting accept deadline")
+			logger.Err(err).Msg("Error setting accept deadline")
 			time.Sleep(errSleepTime)
 			continue
 		}
@@ -271,40 +263,36 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 			if strings.Contains(err.Error(), "timeout") {
 				continue
 			} else {
-				log.Err(err).Msg("An error occurred attempting to accept the incoming connection")
+				logger.Err(err).Msg("An error occurred attempting to accept the incoming connection")
 				time.Sleep(errSleepTime)
 				continue
 			}
 		}
 
 		// update logger context
-		log = log.With().Str("src", lc.RemoteAddr().String()).Logger()
-		log.Info().Msg("connection established from mlat-client")
+		logger = logger.With().Str("src", lc.RemoteAddr().String()).Logger()
+		logger.Info().Msg("connection established from mlat-client")
 
-		log.Info().Msg("initiating tunnel connection to plane.watch")
+		logger.Info().Msg("initiating tunnel connection to plane.watch")
 
 		// connect plane.watch endpoint
-		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey)
+		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey, insecure)
 		if err != nil {
-			log.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection.")
-			lc.Close()
+			logger.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection.")
+			_ = lc.Close()
 			continue
 		}
 
 		// update user
-		log.Info().Msg("feeding MLAT results to plane.watch")
+		logger.Info().Msg("feeding MLAT results to plane.watch")
 
 		// tunnel data
-		innerWg.Add(1)
-		go func() {
-			defer innerWg.Done()
-			dataMoverNettoTLS(ctx, lc, pwc, &ts, log)
-		}()
-		innerWg.Add(1)
-		go func() {
-			defer innerWg.Done()
-			dataMoverTLStoNet(ctx, pwc, lc, &ts, log)
-		}()
+		innerWg.Go(func() {
+			dataMoverNettoTLS(ctx, lc, pwc, &ts, logger)
+		})
+		innerWg.Go(func() {
+			dataMoverTLStoNet(ctx, pwc, lc, &ts, logger)
+		})
 
 		// chan for waitgroup
 		wgChan := make(chan bool)
@@ -316,9 +304,9 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		select {
 		// if context closure, exit
 		case <-ctx.Done():
-			log.Debug().Msg("stopping")
-			lc.Close()
-			pwc.Close()
+			logger.Debug().Msg("stopping")
+			_ = lc.Close()
+			_ = pwc.Close()
 			innerWg.Wait()
 			outerWg.Wait()
 			return
@@ -326,10 +314,10 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		// wait for goroutines to finish
 		case <-wgChan:
 			// close connections
-			lc.Close()
-			pwc.Close()
+			_ = lc.Close()
+			_ = pwc.Close()
 			// let user know
-			log.Warn().Msg("tunnel to plane.watch has been terminated")
+			logger.Warn().Msg("tunnel to plane.watch has been terminated")
 		}
 	}
 }

@@ -25,7 +25,7 @@ var (
 		Name:        "pw-feeder",
 		Usage:       "feed ADS-B data to plane.watch",
 		Description: `Plane Watch Feeder Client`,
-		Version:     "0.0.4",
+		Version:     "0.0.5",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "apikey",
@@ -83,6 +83,12 @@ var (
 				Usage:   "Enable debug logging",
 				EnvVars: []string{"DEBUG"},
 			},
+			&cli.BoolFlag{
+				Name:    "insecure",
+				Hidden:  true,
+				Usage:   "Skip verify of server certificate",
+				EnvVars: []string{"INSECURE"},
+			},
 		},
 	}
 )
@@ -95,7 +101,7 @@ func commithash() string {
 			}
 		}
 	}
-	return ""
+	return "unknown"
 }
 
 func main() {
@@ -152,49 +158,47 @@ func runFeeder(cliContext *cli.Context) error {
 		cancel()
 		return err
 	}
-	defer listenMLAT.Close()
+	defer func() {
+		_ = listenMLAT.Close()
+	}()
 
 	// prep signal handler
 	sigTermChan := make(chan os.Signal)
 	signal.Notify(sigTermChan, syscall.SIGTERM)
 
 	// start beast tunnel
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		connproxy.ProxyBEASTConnection(
 			ctx,
 			"BEAST",
 			fmt.Sprintf("%s:%s", cliContext.String("beasthost"), cliContext.String("beastport")),
 			cliContext.String("beastout"),
 			cliContext.String("apikey"),
+			cliContext.Bool("insecure"),
 		)
-	}()
+	})
 
 	// start MLAT tunnel
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		connproxy.ProxyMLATConnection(
 			ctx,
 			"MLAT",
 			listenMLAT,
 			cliContext.String("mlatout"),
 			cliContext.String("apikey"),
+			cliContext.Bool("insecure"),
 		)
-	}()
+	})
 
 	// start status updater
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		atc_status.Start(
 			ctx,
 			cliContext.String("atcurl"),
 			cliContext.String("apikey"),
 			300,
 		)
-	}()
+	})
 
 	// wait for sigterm
 	_ = <-sigTermChan
