@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
+func Connect(name, addr, sni string, insecure bool) (c *tls.Conn, err error) {
 
 	log := log.With().Str("name", name).Str("addr", addr).Logger()
 
@@ -31,7 +31,7 @@ func StunnelConnect(name, addr, sni string) (c *tls.Conn, err error) {
 			}
 
 			// if the certificate is not a CA, then check it
-			if !cert.IsCA {
+			if !insecure && !cert.IsCA {
 
 				// ensure the certificate hostname matches the host we're trying to connect to
 				err := cert.VerifyHostname(remoteHost)

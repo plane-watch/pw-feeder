@@ -29,8 +29,8 @@ var (
 	errSleepTime     = time.Second * 10
 
 	// wrapper to stunnelConnect to allow overriding for testing
-	connectToPlaneWatch = func(name string, addr string, sni string) (c net.Conn, err error) {
-		return stunnel.StunnelConnect(name, addr, sni)
+	connectToPlaneWatch = func(name, addr, sni string, insecure bool) (c net.Conn, err error) {
+		return stunnel.Connect(name, addr, sni, insecure)
 	}
 )
 
@@ -131,7 +131,7 @@ func logStats(ctx context.Context, ts *tunnelStats, proto string, interval time.
 	}
 }
 
-func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint, apikey string) {
+func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint, apikey string, insecure bool) (net.Conn, error) {
 
 	log := log.With().Str("src", localaddr).Str("dst", pwendpoint).Str("proto", protoname).Logger()
 
@@ -154,7 +154,7 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		case _ = <-ctx.Done():
 			log.Debug().Msg("stopping")
 			outerWg.Wait()
-			return
+			return nil, nil
 		default:
 		}
 
@@ -171,7 +171,7 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		log.Info().Msg("initiating tunnel connection to plane.watch")
 
 		// connect plane.watch endpoint (pwc = plane.watch connection)
-		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey)
+		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey, insecure)
 		if err != nil {
 			log.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection")
 			lc.Close()
@@ -217,7 +217,7 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 			lc.Close()
 			innerWg.Wait()
 			outerWg.Wait()
-			return
+			return nil, nil
 
 		// wait for goroutines to finish
 		case <-wgChan:
@@ -230,7 +230,7 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 	}
 }
 
-func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Listener, pwendpoint, apikey string) {
+func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Listener, pwendpoint, apikey string, insecure bool) {
 
 	log := log.With().Str("listen", listener.Addr().String()).Str("dst", pwendpoint).Str("proto", protoname).Logger()
 	log.Info().Msg("listening for connections from mlat-client")
@@ -284,7 +284,7 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		log.Info().Msg("initiating tunnel connection to plane.watch")
 
 		// connect plane.watch endpoint
-		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey)
+		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey, insecure)
 		if err != nil {
 			log.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection.")
 			lc.Close()

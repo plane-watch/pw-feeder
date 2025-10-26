@@ -83,6 +83,12 @@ var (
 				Usage:   "Enable debug logging",
 				EnvVars: []string{"DEBUG"},
 			},
+			&cli.BoolFlag{
+				Name:    "insecure",
+				Hidden:  true,
+				Usage:   "Skip verify of server certificate",
+				EnvVars: []string{"INSECURE"},
+			},
 		},
 	}
 )
@@ -129,7 +135,7 @@ func main() {
 
 func runFeeder(cliContext *cli.Context) error {
 	log.Info().
-		Str("commithash", commithash()[:7]).
+		//Str("commithash", commithash()[:7]).
 		Str("version", app.Version).
 		Msg("plane.watch feeder started")
 
@@ -168,6 +174,7 @@ func runFeeder(cliContext *cli.Context) error {
 			fmt.Sprintf("%s:%s", cliContext.String("beasthost"), cliContext.String("beastport")),
 			cliContext.String("beastout"),
 			cliContext.String("apikey"),
+			cliContext.Bool("insecure"),
 		)
 	}()
 
@@ -181,6 +188,7 @@ func runFeeder(cliContext *cli.Context) error {
 			listenMLAT,
 			cliContext.String("mlatout"),
 			cliContext.String("apikey"),
+			cliContext.Bool("insecure"),
 		)
 	}()
 
