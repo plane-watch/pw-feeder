@@ -28,7 +28,7 @@ jobs:
           cd pw-feeder
           go test -v -race -timeout=300s -count=3 -coverprofile=coverage.txt ./...
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
 
   upload_linux:
     name: Linux Binaries
