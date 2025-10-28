@@ -221,6 +221,10 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 			// let user know
 			logger.Warn().Msg("tunnel to plane.watch has been terminated")
 		}
+
+		// back-off
+		logger.Info().Msg("reconnecting in 10 seconds")
+		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -319,5 +323,9 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 			// let user know
 			logger.Warn().Msg("tunnel to plane.watch has been terminated")
 		}
+
+		// back-off
+		logger.Info().Msg("reconnecting in 10 seconds")
+		time.Sleep(10 * time.Second)
 	}
 }
