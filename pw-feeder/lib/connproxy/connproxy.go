@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"pw-feeder/lib/backoff"
 	"strings"
 	"sync"
 	"time"
@@ -143,6 +144,9 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		logStats(ctx, &ts, protoname, logStatsInterval)
 	})
 
+	bo := backoff.New(backoff.WithResetAfter(5 * time.Minute))
+	retry := false
+
 	for {
 
 		innerWg := sync.WaitGroup{}
@@ -155,6 +159,17 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 			return
 		default:
 		}
+
+		if retry {
+			sleepTime := bo.BackOff()
+			if sleepTime > 0 {
+				logger.Info().Msgf("retrying in %d seconds", sleepTime)
+			} else {
+				logger.Info().Msg("retrying")
+			}
+			time.Sleep(sleepTime)
+		}
+		retry = true
 
 		logger.Info().Msg("initiating connection to BEAST provider")
 
@@ -221,10 +236,6 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 			// let user know
 			logger.Warn().Msg("tunnel to plane.watch has been terminated")
 		}
-
-		// back-off
-		logger.Info().Msg("reconnecting in 10 seconds")
-		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -241,6 +252,9 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		logStats(ctx, &ts, protoname, logStatsInterval)
 	})
 
+	bo := backoff.New(backoff.WithResetAfter(5 * time.Minute))
+	retry := false
+
 	for {
 
 		innerWg := sync.WaitGroup{}
@@ -253,6 +267,17 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 			return
 		default:
 		}
+
+		if retry {
+			sleepTime := bo.BackOff()
+			if sleepTime > 0 {
+				logger.Info().Msgf("retrying in %d seconds", sleepTime)
+			} else {
+				logger.Info().Msg("retrying")
+			}
+			time.Sleep(sleepTime)
+		}
+		retry = true
 
 		// wait for local connection with deadline
 		err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(time.Second * 1))
@@ -323,9 +348,5 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 			// let user know
 			logger.Warn().Msg("tunnel to plane.watch has been terminated")
 		}
-
-		// back-off
-		logger.Info().Msg("reconnecting in 10 seconds")
-		time.Sleep(10 * time.Second)
 	}
 }
