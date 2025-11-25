@@ -25,7 +25,7 @@ var (
 		Name:        "pw-feeder",
 		Usage:       "feed ADS-B data to plane.watch",
 		Description: `Plane Watch Feeder Client`,
-		Version:     "0.0.5",
+		Version:     "0.0.6",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "apikey",
@@ -88,6 +88,11 @@ var (
 				Hidden:  true,
 				Usage:   "Skip verify of server certificate",
 				EnvVars: []string{"INSECURE"},
+			},
+			&cli.BoolFlag{
+				Name:    "nomlat",
+				Usage:   "Disable MLAT",
+				EnvVars: []string{"NOMLAT"},
 			},
 		},
 	}
@@ -153,14 +158,17 @@ func runFeeder(cliContext *cli.Context) error {
 	wg := sync.WaitGroup{}
 
 	// prep mlat listener
-	listenMLAT, err := net.Listen("tcp", fmt.Sprintf("%s:%s", cliContext.String("mlatserverhost"), cliContext.String("mlatserverport")))
-	if err != nil {
-		cancel()
-		return err
+	var listenMLAT net.Listener
+	if !cliContext.Bool("nomlat") {
+		listenMLAT, err = net.Listen("tcp", fmt.Sprintf("%s:%s", cliContext.String("mlatserverhost"), cliContext.String("mlatserverport")))
+		if err != nil {
+			cancel()
+			return err
+		}
+		defer func() {
+			_ = listenMLAT.Close()
+		}()
 	}
-	defer func() {
-		_ = listenMLAT.Close()
-	}()
 
 	// prep signal handler
 	sigTermChan := make(chan os.Signal)
@@ -179,16 +187,18 @@ func runFeeder(cliContext *cli.Context) error {
 	})
 
 	// start MLAT tunnel
-	wg.Go(func() {
-		connproxy.ProxyMLATConnection(
-			ctx,
-			"MLAT",
-			listenMLAT,
-			cliContext.String("mlatout"),
-			cliContext.String("apikey"),
-			cliContext.Bool("insecure"),
-		)
-	})
+	if !cliContext.Bool("nomlat") {
+		wg.Go(func() {
+			connproxy.ProxyMLATConnection(
+				ctx,
+				"MLAT",
+				listenMLAT,
+				cliContext.String("mlatout"),
+				cliContext.String("apikey"),
+				cliContext.Bool("insecure"),
+			)
+		})
+	}
 
 	// start status updater
 	wg.Go(func() {
