@@ -25,7 +25,7 @@ var (
 		Name:        "pw-feeder",
 		Usage:       "feed ADS-B data to plane.watch",
 		Description: `Plane Watch Feeder Client`,
-		Version:     "0.0.5",
+		Version:     "0.0.6",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "apikey",
