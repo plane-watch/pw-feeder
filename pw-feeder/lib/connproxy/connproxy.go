@@ -163,7 +163,7 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		if retry {
 			sleepTime := bo.BackOff()
 			if sleepTime > 0 {
-				logger.Info().Msgf("retrying in %d seconds", sleepTime)
+				logger.Info().Msgf("retrying in %s seconds", sleepTime.String())
 			} else {
 				logger.Info().Msg("retrying")
 			}
@@ -177,7 +177,6 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		lc, err := network.ConnectToHost(protoname, localaddr)
 		if err != nil {
 			logger.Err(err).Msg("tunnel terminated. could not connect to the local data source, please ensure it is running and listening on the specified port")
-			time.Sleep(errSleepTime)
 			continue
 		}
 
@@ -188,7 +187,6 @@ func ProxyBEASTConnection(ctx context.Context, protoname, localaddr, pwendpoint,
 		if err != nil {
 			logger.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection")
 			_ = lc.Close()
-			time.Sleep(errSleepTime)
 			continue
 		}
 
@@ -271,7 +269,7 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		if retry {
 			sleepTime := bo.BackOff()
 			if sleepTime > 0 {
-				logger.Info().Msgf("retrying in %d seconds", sleepTime)
+				logger.Info().Msgf("retrying in %s seconds", sleepTime.String())
 			} else {
 				logger.Info().Msg("retrying")
 			}
@@ -283,17 +281,16 @@ func ProxyMLATConnection(ctx context.Context, protoname string, listener net.Lis
 		err := listener.(*net.TCPListener).SetDeadline(time.Now().Add(time.Second * 1))
 		if err != nil {
 			logger.Err(err).Msg("Error setting accept deadline")
-			time.Sleep(errSleepTime)
 			continue
 		}
 
 		lc, err := listener.Accept()
 		if err != nil {
 			if strings.Contains(err.Error(), "timeout") {
+				retry = false
 				continue
 			} else {
 				logger.Err(err).Msg("An error occurred attempting to accept the incoming connection")
-				time.Sleep(errSleepTime)
 				continue
 			}
 		}
