@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Codecov
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version: '>=1.25.0'
@@ -39,7 +39,7 @@ jobs:
         arch: [386,amd64,arm,arm64]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - uses: actions/setup-go@v6
       with:
         go-version: '>=1.25.0'
