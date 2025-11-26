@@ -12,6 +12,7 @@ import (
 	"pw-feeder/lib/network"
 	"pw-feeder/lib/stunnel"
 
+	"github.com/dustin/go-humanize"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -121,10 +122,10 @@ func logStats(ctx context.Context, ts *tunnelStats, proto string, interval time.
 		case <-time.After(interval):
 			bytesRxLocal, bytesTxLocal, bytesRxRemote, bytesTxRemote := ts.readStats()
 			log.Info().
-				Uint64("bytesRxLocal", bytesRxLocal).
-				Uint64("bytesTxLocal", bytesTxLocal).
-				Uint64("bytesRxRemote", bytesRxRemote).
-				Uint64("bytesTxRemote", bytesTxRemote).
+				Str("RxLocal", humanize.Bytes(bytesRxLocal)).
+				Str("TxLocal", humanize.Bytes(bytesTxLocal)).
+				Str("RxRemote", humanize.Bytes(bytesRxRemote)).
+				Str("TxRemote", humanize.Bytes(bytesTxRemote)).
 				Str("proto", proto).
 				Msg("connection statistics")
 		}
