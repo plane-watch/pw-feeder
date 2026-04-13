@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -39,21 +39,27 @@ var (
 func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 
 	// make atc api request
-	requestURL := fmt.Sprintf("%s/api/v1/feeders/%s/status.json", atcUrl, apiKey)
+	requestURL, err := url.JoinPath(atcUrl, "api", "v1", "feeders", apiKey, "status.json")
+	if err != nil {
+		log.Err(err).Str("url", requestURL).Str("atcurl", atcUrl).Msg("invalid url")
+		return err
+	}
 	res, err := http.Get(requestURL)
 	if err != nil {
 		log.Err(err).Str("url", requestURL).Msg("error making http request")
 		return err
-	}
-	if res.StatusCode != http.StatusOK {
-		log.Err(err).Str("url", requestURL).Msg("bad response")
-		return ErrResponseNotOK
 	}
 
 	// defer closure response body
 	defer func() {
 		_ = res.Body.Close()
 	}()
+
+	// check response code
+	if res.StatusCode != http.StatusOK {
+		log.Err(err).Str("url", requestURL).Msg("bad response")
+		return ErrResponseNotOK
+	}
 
 	// read response body
 	body, err := io.ReadAll(res.Body)
