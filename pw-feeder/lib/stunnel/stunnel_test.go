@@ -115,6 +115,104 @@ func GenerateSelfSignedTLSCertAndKey(keyFile, certFile *os.File) error {
 	return nil
 }
 
+func GenerateTLSCertificateChain(t *testing.T) (*x509.Certificate, *x509.Certificate, *x509.Certificate) {
+	t.Helper()
+
+	notBefore := time.Now().Add(-time.Minute)
+	notAfter := time.Now().Add(time.Minute * 15)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+
+	newSerialNumber := func() *big.Int {
+		t.Helper()
+
+		serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+		require.NoError(t, err)
+
+		return serialNumber
+	}
+
+	_, rootPriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	rootTemplate := x509.Certificate{
+		SerialNumber: newSerialNumber(),
+		Subject: pkix.Name{
+			CommonName: "test root",
+		},
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		MaxPathLen:            1,
+	}
+
+	rootDER, err := x509.CreateCertificate(rand.Reader, &rootTemplate, &rootTemplate, rootPriv.Public().(ed25519.PublicKey), rootPriv)
+	require.NoError(t, err)
+
+	rootCert, err := x509.ParseCertificate(rootDER)
+	require.NoError(t, err)
+
+	_, intermediatePriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	intermediateTemplate := x509.Certificate{
+		SerialNumber: newSerialNumber(),
+		Subject: pkix.Name{
+			CommonName: "test intermediate",
+		},
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		MaxPathLen:            0,
+	}
+
+	intermediateDER, err := x509.CreateCertificate(rand.Reader, &intermediateTemplate, rootCert, intermediatePriv.Public().(ed25519.PublicKey), rootPriv)
+	require.NoError(t, err)
+
+	intermediateCert, err := x509.ParseCertificate(intermediateDER)
+	require.NoError(t, err)
+
+	_, leafPriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	leafTemplate := x509.Certificate{
+		SerialNumber: newSerialNumber(),
+		Subject: pkix.Name{
+			CommonName: "localhost",
+		},
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{net.IPv4(127, 0, 0, 1)},
+	}
+
+	leafDER, err := x509.CreateCertificate(rand.Reader, &leafTemplate, intermediateCert, leafPriv.Public().(ed25519.PublicKey), intermediatePriv)
+	require.NoError(t, err)
+
+	leafCert, err := x509.ParseCertificate(leafDER)
+	require.NoError(t, err)
+
+	return rootCert, intermediateCert, leafCert
+}
+
+func TestVerifyPeerCertificatesUsesPresentedIntermediates(t *testing.T) {
+
+	rootCert, intermediateCert, leafCert := GenerateTLSCertificateChain(t)
+
+	roots := x509.NewCertPool()
+	roots.AddCert(rootCert)
+
+	require.NoError(t, verifyPeerCertificates([]*x509.Certificate{leafCert, intermediateCert}, roots, "localhost"))
+	require.Error(t, verifyPeerCertificates([]*x509.Certificate{leafCert}, roots, "localhost"))
+
+}
+
 func TestStunnel(t *testing.T) {
 
 	// prep cert file
@@ -192,7 +290,7 @@ func TestStunnel(t *testing.T) {
 		}
 	})
 
-	conn, err := Connect("TEST", listener.Addr().String(), testSNI.String(), false)
+	conn, err := Connect("TEST", listener.Addr().String(), testSNI.String(), true)
 	require.NoError(t, err)
 
 	// test write
