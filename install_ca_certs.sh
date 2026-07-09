@@ -10,10 +10,10 @@ sudo curl -o lets-encrypt-e7.crt https://letsencrypt.org/certs/2024/e7.pem
 sudo curl -o lets-encrypt-e8.crt https://letsencrypt.org/certs/2024/e8.pem
 sudo curl -o lets-encrypt-r12.crt https://letsencrypt.org/certs/2024/r12.pem
 sudo curl -o lets-encrypt-r13.crt https://letsencrypt.org/certs/2024/r13.pem
-sudo curl -o lets-encrypt-ye1.crt https://letsencrypt.org/certs/gen-y/int-ye1.pem
-sudo curl -o lets-encrypt-ye2.crt https://letsencrypt.org/certs/gen-y/int-ye2.pem
-sudo curl -o lets-encrypt-yr1.crt https://letsencrypt.org/certs/gen-y/int-yr1.pem
-sudo curl -o lets-encrypt-yr2.crt https://letsencrypt.org/certs/gen-y/int-yr2.pem
+#sudo curl -o lets-encrypt-ye1.crt https://letsencrypt.org/certs/gen-y/int-ye1.pem
+#sudo curl -o lets-encrypt-ye2.crt https://letsencrypt.org/certs/gen-y/int-ye2.pem
+#sudo curl -o lets-encrypt-yr1.crt https://letsencrypt.org/certs/gen-y/int-yr1.pem
+#sudo curl -o lets-encrypt-yr2.crt https://letsencrypt.org/certs/gen-y/int-yr2.pem
 cd /usr/share/ca-certificates
 find letsencrypt/ -maxdepth 1 -type f -iname '*.crt' | sudo tee -a /etc/ca-certificates.conf
 sudo update-ca-certificates
