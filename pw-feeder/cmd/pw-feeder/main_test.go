@@ -22,12 +22,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// connHandlerEcho echoes data received from conn until the connection fails.
 func connHandlerEcho(t *testing.T, conn net.Conn) {
-	// handles incoming connections
-	// echoes all data back to client
-
 	var (
-		sendRecvBufferSize = 256 * 1024 // 256kB
+		sendRecvBufferSize = 256 * 1024 // Use a 256 kB buffer.
 	)
 
 	defer func() {
@@ -37,13 +35,13 @@ func connHandlerEcho(t *testing.T, conn net.Conn) {
 	buf := make([]byte, sendRecvBufferSize)
 	for {
 
-		// read data
+		// Read data from the client.
 		bytesRead, err := conn.Read(buf)
 		if err != nil {
 			break
 		}
 
-		// echo data back
+		// Echo the data to the client.
 		_, err = conn.Write(buf[:bytesRead])
 		if err != nil {
 			break
@@ -51,12 +49,10 @@ func connHandlerEcho(t *testing.T, conn net.Conn) {
 	}
 }
 
+// connHandlerChan exchanges connection data through the supplied channels.
 func connHandlerChan(t *testing.T, conn net.Conn, dataIn, dataOut chan []byte) {
-	// handles incoming connections
-	// echoes all data back to client
-
 	var (
-		sendRecvBufferSize = 256 * 1024 // 256kB
+		sendRecvBufferSize = 256 * 1024 // Use a 256 kB buffer.
 	)
 
 	defer func() {
@@ -69,13 +65,13 @@ func connHandlerChan(t *testing.T, conn net.Conn, dataIn, dataOut chan []byte) {
 
 		bufIn := <-dataIn
 
-		// write data from chan
+		// Write data received from the input channel.
 		_, err := conn.Write(bufIn)
 		if err != nil {
 			t.Error(err)
 		}
 
-		// read data into chan
+		// Send received data to the output channel.
 		bytesRead, err := conn.Read(bufOut)
 		if err != nil {
 			t.Error(err)
@@ -85,10 +81,10 @@ func connHandlerChan(t *testing.T, conn net.Conn, dataIn, dataOut chan []byte) {
 	}
 }
 
+// prepCertsForTesting creates a certificate authority and a signed server
+// certificate for TLS tests.
 func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Buffer, err error) {
-	// creates a CA cert and server cert (& priv keys) for testing
-
-	// prep CA cert for testing
+	// Prepare the test CA certificate.
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(42069247),
 		Subject: pkix.Name{
@@ -107,7 +103,7 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 		BasicConstraintsValid: true,
 	}
 
-	// prep CA cert priv key for testing
+	// Generate the CA private key.
 	caPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		t.Log("Error creating CA private key for testing")
@@ -115,7 +111,7 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 		return certPEM, certPrivKeyPEM, caPEM, err
 	}
 
-	// create CA cert
+	// Create the CA certificate.
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
 	if err != nil {
 		t.Log("Error creating CA certificate for testing")
@@ -123,7 +119,7 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 		return certPEM, certPrivKeyPEM, caPEM, err
 	}
 
-	// PEM Encode CA cert
+	// PEM-encode the CA certificate and private key.
 	caPEM = new(bytes.Buffer)
 	err = pem.Encode(caPEM, &pem.Block{
 		Type:  "CERTIFICATE",
@@ -145,7 +141,7 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 		return certPEM, certPrivKeyPEM, caPEM, err
 	}
 
-	// prep server cert
+	// Prepare the server certificate.
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(1234),
 		Subject: pkix.Name{
@@ -164,7 +160,7 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 
-	// prep server priv key
+	// Generate the server private key.
 	certPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		t.Log("Error creating private key for testing")
@@ -172,7 +168,7 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 		return certPEM, certPrivKeyPEM, caPEM, err
 	}
 
-	// self-sign the cert
+	// Sign the server certificate with the test CA.
 	certBytes, err := x509.CreateCertificate(rand.Reader, cert, ca, &certPrivKey.PublicKey, caPrivKey)
 	if err != nil {
 		t.Log("Error creating server certificate for testing")
@@ -180,7 +176,7 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 		return certPEM, certPrivKeyPEM, caPEM, err
 	}
 
-	// PEM Encode server cert
+	// PEM-encode the server certificate and private key.
 	certPEM = new(bytes.Buffer)
 	err = pem.Encode(certPEM, &pem.Block{
 		Type:  "CERTIFICATE",
@@ -205,10 +201,9 @@ func prepCertsForTesting(t *testing.T) (certPEM, certPrivKeyPEM, caPEM *bytes.Bu
 	return certPEM, certPrivKeyPEM, caPEM, err
 }
 
+// startTLSServer starts a TLS echo server for tests.
 func startTLSServer(t *testing.T, wg *sync.WaitGroup, addr string) {
-	// a simple TLS echo server for testing
-
-	// prep certs for test
+	// Prepare certificates for the test server.
 	t.Log("creating self-signed cert for testing")
 	certPEM, certPrivKeyPEM, caPEM, err := prepCertsForTesting(t)
 	if err != nil {
@@ -217,7 +212,7 @@ func startTLSServer(t *testing.T, wg *sync.WaitGroup, addr string) {
 	}
 	assert.NoError(t, err)
 
-	// prep x509 keypair for test
+	// Prepare the X.509 key pair.
 	t.Log("creating self-signed x509 keypair for testing")
 	serverCert, err := tls.X509KeyPair(certPEM.Bytes(), certPrivKeyPEM.Bytes())
 	if err != nil {
@@ -226,15 +221,15 @@ func startTLSServer(t *testing.T, wg *sync.WaitGroup, addr string) {
 	}
 	assert.NoError(t, err)
 
-	// prep cert pool
+	// Prepare the certificate pool.
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(caPEM.Bytes())
 
-	// tls config for testing server
+	// Configure the test TLS server.
 	tlsConfig := tls.Config{}
 	tlsConfig.Certificates = []tls.Certificate{serverCert}
 
-	// start TLS server
+	// Start the TLS server.
 	t.Log("start tls.Listen")
 	tlsListener, err := tls.Listen("tcp", addr, &tlsConfig)
 	if err != nil {
@@ -246,7 +241,7 @@ func startTLSServer(t *testing.T, wg *sync.WaitGroup, addr string) {
 
 	wg.Done()
 
-	// handle incoming connections
+	// Handle incoming connections.
 	for {
 		c, err := tlsListener.Accept()
 		if err != nil {
@@ -260,13 +255,9 @@ func startTLSServer(t *testing.T, wg *sync.WaitGroup, addr string) {
 	}
 }
 
+// startTCPServer starts a test TCP server that exchanges data through channels.
 func startTCPServer(t *testing.T, wg *sync.WaitGroup, addr string, dataIn, dataOut chan []byte) {
-	// a simple TCP server for testing
-	// should connect to an echo server
-	// data can be sent through "the system" via dataIn chan
-	// data should end up in the dataOut chan
-
-	// start server
+	// Start the server.
 	t.Log("start net.Listen")
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -278,7 +269,7 @@ func startTCPServer(t *testing.T, wg *sync.WaitGroup, addr string, dataIn, dataO
 
 	wg.Done()
 
-	// handle incoming connections
+	// Handle incoming connections.
 	for {
 		c, err := listener.Accept()
 		if err != nil {
@@ -292,16 +283,15 @@ func startTCPServer(t *testing.T, wg *sync.WaitGroup, addr string, dataIn, dataO
 	}
 }
 
+// startTCPClient starts a test TCP client that exchanges data through channels.
 func startTCPClient(t *testing.T, addr string, dataIn, dataOut chan []byte) {
-	// a simple TCP client for testing
-
 	var (
-		sendRecvBufferSize = 256 * 1024 // 256kB
+		sendRecvBufferSize = 256 * 1024 // Use a 256 kB buffer.
 	)
 
 	buf := make([]byte, sendRecvBufferSize)
 
-	// start client
+	// Start the client.
 	t.Log("start net.Dial")
 	c, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -324,6 +314,8 @@ func startTCPClient(t *testing.T, addr string, dataIn, dataOut chan []byte) {
 	}
 }
 
+// TestApplicationLogsAreRedacted verifies that configured secrets are removed
+// from string fields and errors without affecting safe text.
 func TestApplicationLogsAreRedacted(t *testing.T) {
 	var output bytes.Buffer
 
@@ -349,7 +341,7 @@ func TestApplicationLogsAreRedacted(t *testing.T) {
 		log.Logger = previousLogger
 	})
 
-	// check safe text
+	// Check safe text.
 	log.Info().Msg(safeText)
 	got := output.String()
 	require.Contains(t, got, safeText)
@@ -357,7 +349,7 @@ func TestApplicationLogsAreRedacted(t *testing.T) {
 
 	output.Reset()
 
-	// check redacted text
+	// Check redacted string fields.
 	log.Info().Str("api_keys", apiKey.String()+","+secondAPIKey.String()).Msg("test as string")
 	got = output.String()
 	require.NotContains(t, got, apiKey.String())
@@ -366,7 +358,7 @@ func TestApplicationLogsAreRedacted(t *testing.T) {
 
 	output.Reset()
 
-	// check redacted text in an error
+	// Check redacted error text.
 	secretError := errors.New("request failed for API keys " + apiKey.String() + "," + secondAPIKey.String())
 	log.Error().Err(secretError).Msg("test as error")
 	got = output.String()

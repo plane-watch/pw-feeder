@@ -21,10 +21,12 @@ import (
 )
 
 const (
+	// ExitcodeConfigError indicates that the feeder configuration is invalid.
 	ExitcodeConfigError = 78
 )
 
 var (
+	// app defines the pw-feeder command-line application.
 	app = cli.Command{
 		Name:        "pw-feeder",
 		Usage:       "feed ADS-B data to plane.watch",
@@ -37,7 +39,7 @@ var (
 				Required: true,
 				Sources:  cli.EnvVars("API_KEY"),
 				Action: func(ctx context.Context, command *cli.Command, s string) error {
-					// sanity checks on api key entered
+					// Validate the supplied API key.
 					apikey, err := uuid.Parse(command.String("apikey"))
 					if err != nil {
 						return cli.Exit("The API Key provided isn't a valid UUID, please check the arguments or environment file in your docker-compose.yml and try again", ExitcodeConfigError)
@@ -118,12 +120,12 @@ var (
 		Action: runFeeder,
 		Before: func(ctx context.Context, command *cli.Command) (context.Context, error) {
 
-			// set log level
+			// Set the log level.
 			if !command.Bool("debug") {
 				zerolog.SetGlobalLevel(zerolog.InfoLevel)
 			}
 
-			// configure logging
+			// Configure console logging.
 			logConfig := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.UnixDate}
 			if command.Bool("nocolor") {
 				logConfig.FormatTimestamp = func(i interface{}) string {
@@ -136,19 +138,20 @@ var (
 				}
 			}
 
-			// ensure secrets are redacted
+			// Ensure secrets are redacted.
 			redactList := map[string]string{
 				command.String("apikey"): "[API_KEY_REDACTED]",
 			}
 			logConfig.FormatPrepare = redactFromLogs(redactList)
 
-			// set logger
+			// Set the global logger.
 			log.Logger = log.Output(logConfig)
 			return ctx, nil
 		},
 	}
 )
 
+// commithash returns the VCS revision embedded in the binary's build metadata.
 func commithash() string {
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, setting := range info.Settings {
@@ -160,6 +163,7 @@ func commithash() string {
 	return "unknown"
 }
 
+// redactFromLogs returns a log formatter that replaces sensitive values.
 func redactFromLogs(redactList map[string]string) func(event map[string]interface{}) error {
 	return func(event map[string]interface{}) error {
 		for k, v := range event {
@@ -176,26 +180,31 @@ func redactFromLogs(redactList map[string]string) func(event map[string]interfac
 	}
 }
 
+// main runs the command-line application and reports fatal errors.
 func main() {
-	// Run & final exit
 	err := app.Run(context.Background(), os.Args)
 	if err != nil {
 		log.Fatal().Err(err).Msg("plane.watch feeder finishing with an error")
 	}
 }
 
+// runFeeder starts the feeder services and shuts them down on SIGTERM.
 func runFeeder(ctx context.Context, command *cli.Command) error {
 	var err error
 
+	// Log startup information.
 	log.Info().
 		Str("commithash", commithash()[:7]).
 		Str("version", command.Version).
 		Msg("plane.watch feeder started")
 
+	// Set up a cancellable context.
 	ctx, cancel := context.WithCancel(ctx)
+
+	// Track the feeder goroutines for a graceful shutdown.
 	wg := sync.WaitGroup{}
 
-	// prep mlat listener
+	// Prepare the MLAT listener.
 	var listenMLAT net.Listener
 	if !command.Bool("nomlat") {
 		listenMLAT, err = net.Listen("tcp", fmt.Sprintf("%s:%d", command.String("mlatserverhost"), command.Uint("mlatserverport")))
@@ -208,11 +217,11 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 		}()
 	}
 
-	// prep signal handler
+	// Prepare the signal handler.
 	sigTermChan := make(chan os.Signal)
 	signal.Notify(sigTermChan, syscall.SIGTERM)
 
-	// start beast tunnel
+	// Start the BEAST tunnel.
 	wg.Go(func() {
 		connproxy.ProxyBEASTConnection(
 			ctx,
@@ -224,7 +233,7 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 		)
 	})
 
-	// start MLAT tunnel
+	// Start the MLAT tunnel.
 	if !command.Bool("nomlat") {
 		wg.Go(func() {
 			connproxy.ProxyMLATConnection(
@@ -238,7 +247,7 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 		})
 	}
 
-	// start status updater
+	// Start the status updater.
 	wg.Go(func() {
 		atc_status.Start(
 			ctx,
@@ -248,12 +257,15 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 		)
 	})
 
-	// wait for sigterm
+	// Wait for SIGTERM.
 	_ = <-sigTermChan
 	log.Info().Msg("received SIGTERM, stopping")
-	cancel()
-	atc_status.Stop()
 
+	// Cancel the context to stop the feeder goroutines.
+	cancel()
+	atc_status.Stop() // The context cancellation should already have stopped it.
+
+	// Wait for the feeder goroutines to finish.
 	wg.Wait()
 
 	return nil

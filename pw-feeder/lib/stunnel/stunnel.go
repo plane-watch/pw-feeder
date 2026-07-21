@@ -10,18 +10,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Connect establishes a TLS connection to addr using sni as the server name.
+// Unless insecure mode is enabled, it verifies the certificate for addr's host.
 func Connect(name, addr, sni string, insecure bool) (c *tls.Conn, err error) {
 
 	logger := log.With().Str("name", name).Str("addr", addr).Logger()
 
-	// split host/port from addr
+	// Extract the remote host from addr.
 	remoteHost, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		logger.Err(err).Msg("could not split remote host/port")
 		return c, err
 	}
 
-	// load root CAs
+	// Load the system root certificate authorities.
 	var scp *x509.CertPool
 	if !insecure {
 		scp, err = x509.SystemCertPool()
@@ -31,7 +33,7 @@ func Connect(name, addr, sni string, insecure bool) (c *tls.Conn, err error) {
 		}
 	}
 
-	// set up tls config
+	// Configure TLS verification.
 	tlsConfig := tls.Config{
 		ServerName:         sni,
 		InsecureSkipVerify: true,
@@ -52,14 +54,14 @@ func Connect(name, addr, sni string, insecure bool) (c *tls.Conn, err error) {
 		Timeout: 10 * time.Second,
 	}
 
-	// dial remote
+	// Dial the remote endpoint.
 	c, err = tls.DialWithDialer(&d, "tcp", addr, &tlsConfig)
 	if err != nil {
 		// log.Err(err).Caller().Msg("could not connect")
 		return c, err
 	}
 
-	// perform handshake
+	// Perform the TLS handshake.
 	err = c.Handshake()
 	if err != nil {
 		// log.Err(err).Caller().Msg("handshake error")
@@ -71,6 +73,8 @@ func Connect(name, addr, sni string, insecure bool) (c *tls.Conn, err error) {
 
 }
 
+// verifyPeerCertificates verifies the presented certificate chain for dnsName
+// using the supplied root certificate pool.
 func verifyPeerCertificates(peerCertificates []*x509.Certificate, roots *x509.CertPool, dnsName string) error {
 
 	if len(peerCertificates) == 0 {

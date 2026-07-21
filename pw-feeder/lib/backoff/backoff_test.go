@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestBackerOff_BackOff verifies delay calculation and inactivity resets.
 func TestBackerOff_BackOff(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bo := New(WithMethod(DefaultMethodExponentialBackoff), WithResetAfter(30*time.Second))

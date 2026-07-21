@@ -7,18 +7,19 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// ConnectToHost connects to a host, returns a connection object
+// ConnectToHost establishes a TCP connection to addr using the supplied name
+// for log context.
 func ConnectToHost(name, addr string) (c net.Conn, err error) {
 
-	// set log context
+	// Add the connection details to the logger context.
 	logger := log.With().Str("name", name).Str("addr", addr).Logger()
 
-	// prepare dialer with timeout
+	// Prepare a dialer with a connection timeout.
 	d := net.Dialer{
 		Timeout: 10 * time.Second,
 	}
 
-	// dial out
+	// Dial the remote endpoint.
 	c, err = d.Dial("tcp", addr)
 	if err != nil {
 		logger.Err(err).Msg("error establishing connection")
