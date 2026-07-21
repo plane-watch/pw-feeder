@@ -94,7 +94,7 @@ var (
 				Name:    "atcurl",
 				Hidden:  true,
 				Usage:   "atc.plane.watch base URL for API calls",
-				Value:   "http://atc.plane.watch",
+				Value:   "https://atc.plane.watch",
 				Sources: cli.EnvVars("PW_ATC_URL"),
 			},
 			&cli.BoolFlag{
