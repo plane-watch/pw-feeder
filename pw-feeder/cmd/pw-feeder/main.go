@@ -179,8 +179,6 @@ func main() {
 	err := app.Run(context.Background(), os.Args)
 	if err != nil {
 		log.Fatal().Err(err).Msg("plane.watch feeder finishing with an error")
-	} else {
-		log.Info().Msg("plane.watch feeder finishing without error")
 	}
 }
 
