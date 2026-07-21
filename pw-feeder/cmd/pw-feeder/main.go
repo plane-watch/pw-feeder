@@ -25,8 +25,6 @@ const (
 )
 
 var (
-	Redactables = make(map[string]string)
-
 	app = cli.Command{
 		Name:        "pw-feeder",
 		Usage:       "feed ADS-B data to plane.watch",
@@ -47,8 +45,6 @@ var (
 					if apikey.String() == "00000000-0000-0000-0000-000000000000" {
 						return cli.Exit("The API Key provided is the default API key in the documentation, please update the arguments or environment file in your docker-compose.yml and try again", ExitcodeConfigError)
 					}
-					// ensure api key redacted from logs
-					Redactables[s] = "[API_KEY_REDACTED]"
 					return nil
 				},
 			},
@@ -140,8 +136,11 @@ var (
 				}
 			}
 
-			// ensure API Key is redacted
-			logConfig.FormatPrepare = redactFromLogs
+			// ensure secrets are redacted
+			redactList := map[string]string{
+				command.String("apikey"): "[API_KEY_REDACTED]",
+			}
+			logConfig.FormatPrepare = redactFromLogs(redactList)
 
 			// set logger
 			log.Logger = log.Output(logConfig)
@@ -161,18 +160,20 @@ func commithash() string {
 	return "unknown"
 }
 
-func redactFromLogs(event map[string]interface{}) error {
-	for k, v := range event {
-		vStr, isStr := v.(string)
-		if !isStr {
-			continue
+func redactFromLogs(redactList map[string]string) func(event map[string]interface{}) error {
+	return func(event map[string]interface{}) error {
+		for k, v := range event {
+			vStr, isStr := v.(string)
+			if !isStr {
+				continue
+			}
+			for toRedact, redactTo := range redactList {
+				vStr = strings.ReplaceAll(vStr, toRedact, redactTo)
+			}
+			event[k] = vStr
 		}
-		for toRedact, redactTo := range Redactables {
-			vStr = strings.ReplaceAll(vStr, toRedact, redactTo)
-		}
-		event[k] = vStr
+		return nil
 	}
-	return nil
 }
 
 func main() {

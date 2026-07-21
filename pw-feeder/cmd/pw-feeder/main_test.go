@@ -327,29 +327,26 @@ func startTCPClient(t *testing.T, addr string, dataIn, dataOut chan []byte) {
 func TestApplicationLogsAreRedacted(t *testing.T) {
 	var output bytes.Buffer
 
+	apiKey := uuid.New()
+	secondAPIKey := uuid.New()
+	redactedText := "[API_KEY_REDACTED]"
+	safeText := "safe text, no redaction"
+	redactList := map[string]string{
+		apiKey.String():       redactedText,
+		secondAPIKey.String(): redactedText,
+	}
+
 	writer := zerolog.ConsoleWriter{
 		Out:     &output,
 		NoColor: true,
 	}
-	writer.FormatPrepare = redactFromLogs
+	writer.FormatPrepare = redactFromLogs(redactList)
 
 	previousLogger := log.Logger
 	log.Logger = previousLogger.Output(writer)
 
 	t.Cleanup(func() {
 		log.Logger = previousLogger
-	})
-
-	apiKey := uuid.New()
-	secondAPIKey := uuid.New()
-	redactedText := "[API_KEY_REDACTED]"
-	safeText := "safe text, no redaction"
-	Redactables[apiKey.String()] = redactedText
-	Redactables[secondAPIKey.String()] = redactedText
-
-	t.Cleanup(func() {
-		delete(Redactables, apiKey.String())
-		delete(Redactables, secondAPIKey.String())
 	})
 
 	// check safe text
