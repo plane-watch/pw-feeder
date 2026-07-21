@@ -10,6 +10,7 @@ import (
 	"pw-feeder/lib/atc_status"
 	"pw-feeder/lib/connproxy"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -21,6 +22,8 @@ import (
 )
 
 var (
+	Redactables = make(map[string]string)
+
 	app = &cli.App{
 		Name:        "pw-feeder",
 		Usage:       "feed ADS-B data to plane.watch",
@@ -109,6 +112,19 @@ func commithash() string {
 	return "unknown"
 }
 
+func redactFromLogs(event map[string]interface{}) error {
+	for k, v := range event {
+		vStr, isStr := v.(string)
+		if !isStr {
+			continue
+		}
+		for toRedact, redactTo := range Redactables {
+			event[k] = strings.Replace(vStr, toRedact, redactTo, -1)
+		}
+	}
+	return nil
+}
+
 func main() {
 	app.Action = runFeeder
 
@@ -117,6 +133,9 @@ func main() {
 	logConfig.FormatTimestamp = func(i interface{}) string {
 		return fmt.Sprintf("[%s] \x1b[%dm%v\x1b[0m", app.Name, 90, i) // 90 = Dark Gray colour
 	}
+
+	// ensure API Key is redacted
+	logConfig.FormatPrepare = redactFromLogs
 	log.Logger = log.Output(logConfig)
 
 	// Set logging level
@@ -153,6 +172,8 @@ func runFeeder(cliContext *cli.Context) error {
 	if apikey.String() == "00000000-0000-0000-0000-000000000000" {
 		return errors.New("The API Key provided is the default API key in the documentation, please update the arguments or environment file in your docker-compose.yml and try again")
 	}
+
+	Redactables[cliContext.String("apikey")] = "[API_KEY_REDACTED]"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}

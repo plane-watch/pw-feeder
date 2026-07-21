@@ -41,12 +41,12 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 	// make atc api request
 	requestURL, err := url.JoinPath(atcUrl, "api", "v1", "feeders", apiKey, "status.json")
 	if err != nil {
-		log.Err(err).Str("url", requestURL).Str("atcurl", atcUrl).Msg("invalid url")
+		log.Err(err).Str("url", requestURL).Str("atcurl", atcUrl).Msg("could not form request URL")
 		return err
 	}
 	res, err := http.Get(requestURL)
 	if err != nil {
-		log.Err(err).Str("url", requestURL).Msg("error making http request")
+		log.Err(err).Str("url", requestURL).Msg("error making feeder status http request")
 		return err
 	}
 
@@ -57,21 +57,21 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 
 	// check response code
 	if res.StatusCode != http.StatusOK {
-		log.Err(err).Str("url", requestURL).Msg("bad response")
+		log.Err(err).Str("url", requestURL).Msg("bad response from feeder status http request")
 		return ErrResponseNotOK
 	}
 
 	// read response body
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Err(err).Msg("error reading http response body")
+		log.Err(err).Msg("error reading feeder status http response body")
 		return err
 	}
 
 	// unmarshall response
 	err = json.Unmarshal(body, &S)
 	if err != nil {
-		log.Err(err).Msg("error unmarshalling json")
+		log.Err(err).Msg("error unmarshalling json from feeder status http response body")
 		return err
 	}
 

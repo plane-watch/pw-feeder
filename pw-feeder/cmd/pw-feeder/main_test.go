@@ -14,7 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func connHandlerEcho(t *testing.T, conn net.Conn) {
@@ -317,4 +321,39 @@ func startTCPClient(t *testing.T, addr string, dataIn, dataOut chan []byte) {
 		}
 		dataOut <- buf[:bytesRead]
 	}
+}
+
+func TestApplicationLogsAreRedacted(t *testing.T) {
+	var output bytes.Buffer
+
+	writer := zerolog.ConsoleWriter{
+		Out:     &output,
+		NoColor: true,
+	}
+	writer.FormatPrepare = redactFromLogs
+
+	previousLogger := log.Logger
+	log.Logger = previousLogger.Output(writer)
+
+	t.Cleanup(func() {
+		log.Logger = previousLogger
+	})
+
+	apiKey := uuid.New()
+	redactedText := "[API_KEY_REDACTED]"
+	safeText := "safe text, no redaction"
+	Redactables[apiKey.String()] = redactedText
+
+	// check safe text
+	log.Info().Msg(safeText)
+	got := output.String()
+	require.Contains(t, got, safeText)
+
+	output.Reset()
+
+	// check redacted text
+	log.Info().Str("api_key", apiKey.String()).Msg("test as string")
+	got = output.String()
+	require.NotContains(t, got, apiKey.String())
+	require.Contains(t, got, redactedText)
 }
