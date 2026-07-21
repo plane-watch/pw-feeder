@@ -356,6 +356,7 @@ func TestApplicationLogsAreRedacted(t *testing.T) {
 	log.Info().Msg(safeText)
 	got := output.String()
 	require.Contains(t, got, safeText)
+	require.NotContains(t, got, redactedText)
 
 	output.Reset()
 
