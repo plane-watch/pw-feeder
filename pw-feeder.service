@@ -1,14 +1,21 @@
 [Unit]
 Description=plane.watch feeder client
-After=network.target
-StartLimitIntervalSec=0
+Documentation=https://github.com/plane-watch/pw-feeder
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
-Restart=always
-RestartSec=1
-User=root
-ExecStart=/usr/local/bin/pw-feeder --command --line --args
+User=pw-feeder
+Group=pw-feeder
+EnvironmentFile=/etc/pw-feeder/pw-feeder.env
+ExecStart=/usr/local/bin/pw-feeder
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
 
 [Install]
 WantedBy=multi-user.target

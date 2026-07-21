@@ -168,8 +168,9 @@ func redactFromLogs(event map[string]interface{}) error {
 			continue
 		}
 		for toRedact, redactTo := range Redactables {
-			event[k] = strings.Replace(vStr, toRedact, redactTo, -1)
+			vStr = strings.ReplaceAll(vStr, toRedact, redactTo)
 		}
+		event[k] = vStr
 	}
 	return nil
 }

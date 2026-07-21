@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"sync"
@@ -340,9 +341,16 @@ func TestApplicationLogsAreRedacted(t *testing.T) {
 	})
 
 	apiKey := uuid.New()
+	secondAPIKey := uuid.New()
 	redactedText := "[API_KEY_REDACTED]"
 	safeText := "safe text, no redaction"
 	Redactables[apiKey.String()] = redactedText
+	Redactables[secondAPIKey.String()] = redactedText
+
+	t.Cleanup(func() {
+		delete(Redactables, apiKey.String())
+		delete(Redactables, secondAPIKey.String())
+	})
 
 	// check safe text
 	log.Info().Msg(safeText)
@@ -352,8 +360,19 @@ func TestApplicationLogsAreRedacted(t *testing.T) {
 	output.Reset()
 
 	// check redacted text
-	log.Info().Str("api_key", apiKey.String()).Msg("test as string")
+	log.Info().Str("api_keys", apiKey.String()+","+secondAPIKey.String()).Msg("test as string")
 	got = output.String()
 	require.NotContains(t, got, apiKey.String())
-	require.Contains(t, got, redactedText)
+	require.NotContains(t, got, secondAPIKey.String())
+	require.Contains(t, got, redactedText+","+redactedText)
+
+	output.Reset()
+
+	// check redacted text in an error
+	secretError := errors.New("request failed for API keys " + apiKey.String() + "," + secondAPIKey.String())
+	log.Error().Err(secretError).Msg("test as error")
+	got = output.String()
+	require.NotContains(t, got, apiKey.String())
+	require.NotContains(t, got, secondAPIKey.String())
+	require.Contains(t, got, "request failed for API keys "+redactedText+","+redactedText)
 }
