@@ -183,7 +183,7 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 	// prep mlat listener
 	var listenMLAT net.Listener
 	if !command.Bool("nomlat") {
-		listenMLAT, err = net.Listen("tcp", fmt.Sprintf("%s:%s", command.String("mlatserverhost"), command.String("mlatserverport")))
+		listenMLAT, err = net.Listen("tcp", fmt.Sprintf("%s:%d", command.String("mlatserverhost"), command.Uint("mlatserverport")))
 		if err != nil {
 			cancel()
 			return err
@@ -202,7 +202,7 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 		connproxy.ProxyBEASTConnection(
 			ctx,
 			"BEAST",
-			fmt.Sprintf("%s:%s", command.String("beasthost"), command.String("beastport")),
+			fmt.Sprintf("%s:%d", command.String("beasthost"), command.Uint("beastport")),
 			command.String("beastout"),
 			command.String("apikey"),
 			command.Bool("insecure"),
