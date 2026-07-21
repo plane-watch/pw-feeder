@@ -112,13 +112,39 @@ var (
 				Usage:   "Disable MLAT",
 				Sources: cli.EnvVars("NOMLAT"),
 			},
+			&cli.BoolFlag{
+				Name:    "nocolor",
+				Aliases: []string{"nocolour"},
+				Usage:   "Disable color output in log",
+				Sources: cli.EnvVars("NOCOLOR", "NOCOLOUR"),
+			},
 		},
 		Action: runFeeder,
 		Before: func(ctx context.Context, command *cli.Command) (context.Context, error) {
+
 			// set log level
 			if !command.Bool("debug") {
 				zerolog.SetGlobalLevel(zerolog.InfoLevel)
 			}
+
+			// configure logging
+			logConfig := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.UnixDate}
+			if command.Bool("nocolor") {
+				logConfig.FormatTimestamp = func(i interface{}) string {
+					return fmt.Sprintf("[%s] %v", command.Name, i)
+				}
+				logConfig.NoColor = true
+			} else {
+				logConfig.FormatTimestamp = func(i interface{}) string {
+					return fmt.Sprintf("[%s] \x1b[%dm%v\x1b[0m", command.Name, 90, i) // 90 = Dark Gray colour
+				}
+			}
+
+			// ensure API Key is redacted
+			logConfig.FormatPrepare = redactFromLogs
+
+			// set logger
+			log.Logger = log.Output(logConfig)
 			return ctx, nil
 		},
 	}
@@ -149,17 +175,6 @@ func redactFromLogs(event map[string]interface{}) error {
 }
 
 func main() {
-
-	// configure logging
-	logConfig := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.UnixDate}
-	logConfig.FormatTimestamp = func(i interface{}) string {
-		return fmt.Sprintf("[%s] \x1b[%dm%v\x1b[0m", app.Name, 90, i) // 90 = Dark Gray colour
-	}
-
-	// ensure API Key is redacted
-	logConfig.FormatPrepare = redactFromLogs
-	log.Logger = log.Output(logConfig)
-
 	// Run & final exit
 	err := app.Run(context.Background(), os.Args)
 	if err != nil {
