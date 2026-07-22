@@ -25,25 +25,31 @@ import (
 )
 
 var (
-	testSNI  = uuid.New()
+	// testSNI is the TLS server name used by connection tests.
+	testSNI = uuid.New()
+
+	// testData is the payload exchanged by test connections.
 	testData = []byte("the quick brown fox jumps over the lazy dog 9876543210 times")
 )
 
+// init configures console logging for the package tests.
 func init() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.UnixDate})
 }
 
+// GenerateSelfSignedTLSCertAndKey writes a self-signed test certificate and its
+// private key to the supplied files.
 func GenerateSelfSignedTLSCertAndKey(keyFile, certFile *os.File) error {
-	// Thanks to: https://go.dev/src/crypto/tls/generate_cert.go
+	// Based on: https://go.dev/src/crypto/tls/generate_cert.go
 
-	// prep certificate info
+	// Prepare the certificate details.
 	hosts := []string{"localhost"}
 	ipAddrs := []net.IP{net.IPv4(127, 0, 0, 1)}
 	notBefore := time.Now()
 	notAfter := time.Now().Add(time.Minute * 15)
 	//isCA := true
 
-	// generate private key
+	// Generate the private key.
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return err
@@ -51,14 +57,14 @@ func GenerateSelfSignedTLSCertAndKey(keyFile, certFile *os.File) error {
 
 	keyUsage := x509.KeyUsageDigitalSignature
 
-	// generate serial number
+	// Generate the serial number.
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
 		return err
 	}
 
-	// prep cert template
+	// Prepare the certificate template.
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
@@ -72,41 +78,41 @@ func GenerateSelfSignedTLSCertAndKey(keyFile, certFile *os.File) error {
 		BasicConstraintsValid: true,
 	}
 
-	// add hostname(s)
+	// Add the hostnames.
 	for _, host := range hosts {
 		template.DNSNames = append(template.DNSNames, host)
 	}
 
-	// add ip(s)
+	// Add the IP addresses.
 	for _, ip := range ipAddrs {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	}
 
-	// if self-signed, include CA
+	// Include the certificate authority attributes for self-signing.
 	//if isCA {
 	template.IsCA = true
 	template.KeyUsage |= x509.KeyUsageCertSign
 	//}
 
-	// create certificate
+	// Create the certificate.
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, priv.Public().(ed25519.PublicKey), priv)
 	if err != nil {
 		return err
 	}
 
-	// encode certificate
+	// Encode the certificate.
 	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	if err != nil {
 		return err
 	}
 
-	// marhsal private key
+	// Marshal the private key.
 	privBytes, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
 		return err
 	}
 
-	// write private key
+	// Write the private key.
 	err = pem.Encode(keyFile, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
 	if err != nil {
 		return err
@@ -115,6 +121,8 @@ func GenerateSelfSignedTLSCertAndKey(keyFile, certFile *os.File) error {
 	return nil
 }
 
+// GenerateTLSCertificateChain creates a root, intermediate, and leaf certificate
+// for verification tests.
 func GenerateTLSCertificateChain(t *testing.T) (*x509.Certificate, *x509.Certificate, *x509.Certificate) {
 	t.Helper()
 
@@ -201,6 +209,8 @@ func GenerateTLSCertificateChain(t *testing.T) (*x509.Certificate, *x509.Certifi
 	return rootCert, intermediateCert, leafCert
 }
 
+// TestVerifyPeerCertificatesUsesPresentedIntermediates verifies that presented
+// intermediate certificates are included in chain validation.
 func TestVerifyPeerCertificatesUsesPresentedIntermediates(t *testing.T) {
 
 	rootCert, intermediateCert, leafCert := GenerateTLSCertificateChain(t)
@@ -213,9 +223,10 @@ func TestVerifyPeerCertificatesUsesPresentedIntermediates(t *testing.T) {
 
 }
 
+// TestStunnel verifies a successful bidirectional TLS connection.
 func TestStunnel(t *testing.T) {
 
-	// prep cert file
+	// Prepare the certificate file.
 	certFile, err := os.CreateTemp("", "bordercontrol_unit_testing_*_cert.pem")
 	require.NoError(t, err, "prep cert file")
 	t.Cleanup(func() {
@@ -223,7 +234,7 @@ func TestStunnel(t *testing.T) {
 		_ = os.Remove(certFile.Name())
 	})
 
-	// prep key file
+	// Prepare the key file.
 	keyFile, err := os.CreateTemp("", "bordercontrol_unit_testing_*_key.pem")
 	require.NoError(t, err, "prep key file")
 	t.Cleanup(func() {
@@ -231,30 +242,30 @@ func TestStunnel(t *testing.T) {
 		_ = os.Remove(keyFile.Name())
 	})
 
-	// generate cert/key for testing
+	// Generate the certificate and key.
 	err = GenerateSelfSignedTLSCertAndKey(keyFile, certFile)
 	require.NoError(t, err, "generate cert/key for testing")
 
-	// prep tlsConfig for listener
+	// Prepare the listener TLS configuration.
 	cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
 	require.NoError(t, err, "load cert & key from file")
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 	}
 
-	// get listener addr
+	// Create the TCP listener.
 	listener, err := nettest.NewLocalListener("tcp4")
 	require.NoError(t, err)
 
-	// prep listener
+	// Wrap the listener with TLS.
 	tlsListener := tls.NewListener(listener, tlsConfig)
 
-	// prep test config
+	// Prepare the test context.
 	testCtx, testCancel := context.WithCancel(context.Background())
 
 	wgOuter := sync.WaitGroup{}
 
-	// launch listener accepter
+	// Start the listener accept loop.
 	wgOuter.Go(func() {
 
 		buf := make([]byte, 1000)
@@ -293,55 +304,57 @@ func TestStunnel(t *testing.T) {
 	conn, err := Connect("TEST", listener.Addr().String(), testSNI.String(), true)
 	require.NoError(t, err)
 
-	// test write
+	// Test writing through the tunnel.
 	n, err := conn.Write(testData)
 	require.NoError(t, err)
 	assert.Equal(t, len(testData), n)
 
-	// test read
+	// Test reading through the tunnel.
 	buf := make([]byte, 1000)
 	n, err = conn.Read(buf)
 	require.NoError(t, err)
 	assert.Equal(t, len(testData), n)
 	assert.Equal(t, testData, buf[:n])
 
-	// close
+	// Close the client connection.
 	_ = conn.Close()
 
-	// clean up
+	// Stop the listener loop.
 	testCancel()
 	wgOuter.Wait()
 
 }
 
+// TestStunnel_Error_CantConnect verifies errors from an unavailable endpoint.
 func TestStunnel_Error_CantConnect(t *testing.T) {
 
-	// get listener addr
+	// Create a TCP listener.
 	listener, err := nettest.NewLocalListener("tcp4")
 	require.NoError(t, err)
 
-	// introduce error
+	// Close the listener to induce an error.
 	_ = listener.Close()
 
-	// test
+	// Attempt the connection.
 	_, err = Connect("TEST", listener.Addr().String(), testSNI.String(), false)
 	require.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "connection refused"))
 
 }
 
+// TestStunnel_Error_TLSError verifies that a non-TLS endpoint causes a TLS error.
 func TestStunnel_Error_TLSError(t *testing.T) {
 
-	// get listener addr
+	// Create a TCP listener.
 	listener, err := nettest.NewLocalListener("tcp4")
 	require.NoError(t, err)
 
-	// prep test config
+	// Prepare the test context.
 	testCtx, testCancel := context.WithCancel(context.Background())
 
 	wgOuter := sync.WaitGroup{}
 
-	// launch listener accepter
+	// Start the listener accept loop.
 	wgOuter.Go(func() {
 
 		buf := make([]byte, 1000)
@@ -374,11 +387,11 @@ func TestStunnel_Error_TLSError(t *testing.T) {
 		}
 	})
 
-	// test
+	// Attempt the TLS connection.
 	_, err = Connect("TEST", listener.Addr().String(), testSNI.String(), false)
 	require.Error(t, err)
 
-	// clean up
+	// Stop the listener loop.
 	testCancel()
 	wgOuter.Wait()
 
