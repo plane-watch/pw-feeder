@@ -5,10 +5,31 @@ import (
 	"crypto/x509"
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
+
+var (
+	// systemCertPoolOnce ensures the system roots are loaded only once.
+	systemCertPoolOnce sync.Once
+
+	// systemCertPool is shared read-only by all verified TLS connections.
+	systemCertPool *x509.CertPool
+
+	// systemCertPoolErr retains any error encountered while loading system roots.
+	systemCertPoolErr error
+)
+
+// getSystemCertPool returns a process-wide, read-only system certificate pool.
+func getSystemCertPool() (*x509.CertPool, error) {
+	systemCertPoolOnce.Do(func() {
+		systemCertPool, systemCertPoolErr = x509.SystemCertPool()
+	})
+
+	return systemCertPool, systemCertPoolErr
+}
 
 // Connect establishes a TLS connection to addr using sni as the server name.
 // Unless insecure mode is enabled, it verifies the certificate for addr's host.
@@ -26,7 +47,7 @@ func Connect(name, addr, sni string, insecure bool) (c *tls.Conn, err error) {
 	// Load the system root certificate authorities.
 	var scp *x509.CertPool
 	if !insecure {
-		scp, err = x509.SystemCertPool()
+		scp, err = getSystemCertPool()
 		if err != nil {
 			// log.Err(err).Caller().Msg("could not use system cert pool")
 			return c, err

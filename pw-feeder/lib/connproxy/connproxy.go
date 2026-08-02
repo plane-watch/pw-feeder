@@ -46,6 +46,11 @@ var (
 	}
 )
 
+const (
+	// dataMoverBufferSize is the reusable buffer size for each tunnel direction.
+	dataMoverBufferSize = 32 * 1024
+)
+
 // incrementByteCounter atomically adds values to the tunnel byte counters.
 func (ts *tunnelStats) incrementByteCounter(bytesRxLocal, bytesTxLocal, bytesRxRemote, bytesTxRemote uint64) {
 	ts.mu.Lock()
@@ -63,10 +68,8 @@ func (ts *tunnelStats) readStats() (bytesRxLocal, bytesTxLocal, bytesRxRemote, b
 	return ts.bytesRxLocal, ts.bytesTxLocal, ts.bytesRxRemote, ts.bytesTxRemote
 }
 
-// dataMover copies one chunk of data from connIn to connOut.
-func dataMover(connIn net.Conn, connOut net.Conn, log zerolog.Logger) (bytesRead, bytesWritten int, err error) {
-	buf := make([]byte, 256*1024) // Use a 256 kB buffer.
-
+// dataMover copies one chunk of data from connIn to connOut using buf.
+func dataMover(connIn net.Conn, connOut net.Conn, buf []byte, log zerolog.Logger) (bytesRead, bytesWritten int, err error) {
 	// Set a read deadline so the caller can periodically check its context.
 	err = connIn.SetReadDeadline(time.Now().Add(time.Second))
 	if err != nil {
@@ -100,12 +103,13 @@ func dataMover(connIn net.Conn, connOut net.Conn, log zerolog.Logger) (bytesRead
 // until the context is cancelled or a transfer fails.
 func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats, log zerolog.Logger) {
 	log = log.With().Str("conn", "client-side").Logger()
+	buf := make([]byte, dataMoverBufferSize)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			bytesRead, bytesWritten, err := dataMover(connA, connB, log)
+			bytesRead, bytesWritten, err := dataMover(connA, connB, buf, log)
 			if err != nil {
 				return
 			}
@@ -118,12 +122,13 @@ func dataMoverNettoTLS(ctx context.Context, connA net.Conn, connB net.Conn, ts *
 // until the context is cancelled or a transfer fails.
 func dataMoverTLStoNet(ctx context.Context, connA net.Conn, connB net.Conn, ts *tunnelStats, log zerolog.Logger) {
 	log = log.With().Str("conn", "server-side").Logger()
+	buf := make([]byte, dataMoverBufferSize)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			bytesRead, bytesWritten, err := dataMover(connA, connB, log)
+			bytesRead, bytesWritten, err := dataMover(connA, connB, buf, log)
 			if err != nil {
 				return
 			}
@@ -321,11 +326,12 @@ func ProxyBEASTConnection(
 			dataMoverTLStoNet(dataMoverCtx, pwc, lc, &ts, logger)
 		})
 
-		// Use a channel to wait on the inner wait group alongside the context.
-		wgChan := make(chan bool)
+		// Close a channel when the inner wait group finishes so the notifier can
+		// never block if context cancellation wins the select.
+		wgDone := make(chan struct{})
 		go func() {
 			innerWg.Wait()
-			wgChan <- true
+			close(wgDone)
 		}()
 
 		select {
@@ -339,7 +345,7 @@ func ProxyBEASTConnection(
 			return
 
 		// Clean up when the data movers finish.
-		case <-wgChan:
+		case <-wgDone:
 			// Close both ends of the tunnel.
 			_ = lc.Close()
 			_ = pwc.Close()
@@ -502,42 +508,49 @@ func ProxyMLATConnection(
 			}
 		}
 
-		// Add the local client address to the logger context.
-		logger = logger.With().Str("src", lc.RemoteAddr().String()).Logger()
-		logger.Info().Msg("connection established from mlat-client")
+		// Add the local client address only to this connection's logger.
+		// Keeping the base logger unchanged avoids retaining every previous client address.
+		connectionLogger := logger.With().Str("src", lc.RemoteAddr().String()).Logger()
+		connectionLogger.Info().Msg("connection established from mlat-client")
 
-		logger.Info().Msg("initiating tunnel connection to plane.watch")
+		connectionLogger.Info().Msg("initiating tunnel connection to plane.watch")
 
 		// Connect to the plane.watch endpoint.
 		pwc, err := connectToPlaneWatch(protoname, pwendpoint, apikey, insecure)
 		if err != nil {
-			logger.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection.")
+			connectionLogger.Err(err).Msg("tunnel terminated. could not connect to the plane.watch feed-in server, please check your internet connection.")
 			_ = lc.Close()
 			continue
 		}
 
 		// Report that the tunnel is ready.
-		logger.Info().Msg("feeding MLAT results to plane.watch")
+		connectionLogger.Info().Msg("feeding MLAT results to plane.watch")
 
-		// Start tunnelling data in both directions.
+		// Give both directions a shared per-connection context. When either mover
+		// exits, cancellation stops its peer and releases both connections.
+		dataMoverCtx, dataMoverCancel := context.WithCancel(ctx)
+
 		innerWg.Go(func() {
-			dataMoverNettoTLS(ctx, lc, pwc, &ts, logger)
+			defer dataMoverCancel()
+			dataMoverNettoTLS(dataMoverCtx, lc, pwc, &ts, connectionLogger)
 		})
 		innerWg.Go(func() {
-			dataMoverTLStoNet(ctx, pwc, lc, &ts, logger)
+			defer dataMoverCancel()
+			dataMoverTLStoNet(dataMoverCtx, pwc, lc, &ts, connectionLogger)
 		})
 
-		// Use a channel to wait on the inner wait group alongside the context.
-		wgChan := make(chan bool)
+		// Close a channel when the inner wait group finishes so the notifier can
+		// never block if context cancellation wins the select.
+		wgDone := make(chan struct{})
 		go func() {
 			innerWg.Wait()
-			wgChan <- true
+			close(wgDone)
 		}()
 
 		select {
 		// Stop when the parent context is cancelled.
 		case <-ctx.Done():
-			logger.Debug().Msg("stopping")
+			connectionLogger.Debug().Msg("stopping")
 			_ = lc.Close()
 			_ = pwc.Close()
 			innerWg.Wait()
@@ -545,12 +558,12 @@ func ProxyMLATConnection(
 			return
 
 		// Clean up when the data movers finish.
-		case <-wgChan:
+		case <-wgDone:
 			// Close both ends of the tunnel.
 			_ = lc.Close()
 			_ = pwc.Close()
 			// Report the terminated tunnel.
-			logger.Warn().Msg("tunnel to plane.watch has been terminated")
+			connectionLogger.Warn().Msg("tunnel to plane.watch has been terminated")
 		}
 	}
 }

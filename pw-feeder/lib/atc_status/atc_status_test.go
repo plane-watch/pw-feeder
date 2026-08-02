@@ -34,6 +34,8 @@ const (
 	MockServerTestScenarioInvalidJSON
 	// MockServerTestScenarioServerError selects an empty response body.
 	MockServerTestScenarioServerError
+	// MockServerTestScenarioOversizedResponse selects a response over the decode limit.
+	MockServerTestScenarioOversizedResponse
 )
 
 var (
@@ -99,6 +101,8 @@ func PrepMockATCServer(t *testing.T, testScenario int) *httptest.Server {
 				_, _ = w.Write([]byte(resp)[2:])
 			case MockServerTestScenarioServerError:
 				return
+			case MockServerTestScenarioOversizedResponse:
+				_, _ = w.Write([]byte(`{"padding":"` + strings.Repeat("x", maxATCStatusResponseBytes) + `"}`))
 			default:
 				_, _ = w.Write([]byte(resp))
 			}
@@ -179,7 +183,22 @@ func TestGetStatusFromATC(t *testing.T) {
 
 		// Check the result.
 		require.Error(t, err)
-		assert.True(t, strings.Contains(err.Error(), "invalid"))
+		assert.ErrorContains(t, err, "json")
+	})
+
+	t.Run("oversized response", func(t *testing.T) {
+		// Start the test server.
+		testServer := PrepMockATCServer(t, MockServerTestScenarioOversizedResponse)
+		t.Cleanup(func() {
+			testServer.Close()
+		})
+
+		// Retrieve the feeder status.
+		S := ATCStatus{}
+		err := S.getStatusFromATC(testServer.URL, TestFeederAPIKey.String())
+
+		// The response is truncated at the configured limit and cannot be decoded.
+		require.Error(t, err)
 	})
 
 	t.Run("working BEAST", func(t *testing.T) {

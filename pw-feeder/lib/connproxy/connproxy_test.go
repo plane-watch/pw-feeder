@@ -198,7 +198,8 @@ func TestDataMover(t *testing.T) {
 		waitRead := make(chan bool)
 
 		wg.Go(func() {
-			bytesRead, bytesWritten, err := dataMover(connAOut, connBIn, logger)
+			buf := make([]byte, dataMoverBufferSize)
+			bytesRead, bytesWritten, err := dataMover(connAOut, connBIn, buf, logger)
 			require.NoError(t, err)
 			assert.Equal(t, len(testBytes), bytesRead)
 			assert.Equal(t, len(testBytes), bytesWritten)
@@ -237,7 +238,8 @@ func TestDataMover(t *testing.T) {
 		wg := sync.WaitGroup{}
 
 		wg.Go(func() {
-			_, _, err := dataMover(connAOut, connBIn, logger)
+			buf := make([]byte, dataMoverBufferSize)
+			_, _, err := dataMover(connAOut, connBIn, buf, logger)
 			require.Error(t, err)
 		})
 

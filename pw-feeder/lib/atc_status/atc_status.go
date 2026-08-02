@@ -15,6 +15,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	// maxATCStatusResponseBytes bounds the memory used to decode an ATC response.
+	maxATCStatusResponseBytes = 64 * 1024
+)
+
 // ATCStatus represents a feeder status response from the ATC API.
 type ATCStatus struct {
 	// Status contains the connection status for each supported protocol.
@@ -81,33 +86,32 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 		return ErrResponseNotOK
 	}
 
-	// Read the response body.
-	body, err := io.ReadAll(res.Body)
+	// Stream the JSON response into a temporary value.
+	// Limiting the reader avoids retaining both an unbounded response body and its decoded representation.
+	var nextStatus ATCStatus
+	decoder := json.NewDecoder(io.LimitReader(res.Body, maxATCStatusResponseBytes))
+	err = decoder.Decode(&nextStatus)
 	if err != nil {
-		log.Err(err).Msg("error reading feeder status http response body")
-		return err
-	}
-
-	// Decode the JSON response.
-	mu.Lock()
-	defer mu.Unlock()
-	err = json.Unmarshal(body, &S)
-	if err != nil {
-		log.Err(err).Msg("error unmarshalling json from feeder status http response body")
+		log.Err(err).Msg("error decoding json from feeder status http response body")
 		return err
 	}
 
 	// Set a human-readable status for each protocol.
-	if S.Status.ADSB.Connected {
-		S.Status.ADSB.status = "healthy"
+	if nextStatus.Status.ADSB.Connected {
+		nextStatus.Status.ADSB.status = "healthy"
 	} else {
-		S.Status.ADSB.status = "unhealthy"
+		nextStatus.Status.ADSB.status = "unhealthy"
 	}
-	if S.Status.MLAT.Connected {
-		S.Status.MLAT.status = "healthy"
+	if nextStatus.Status.MLAT.Connected {
+		nextStatus.Status.MLAT.status = "healthy"
 	} else {
-		S.Status.MLAT.status = "unhealthy"
+		nextStatus.Status.MLAT.status = "unhealthy"
 	}
+
+	// Only update the status after decoding succeeds.
+	mu.Lock()
+	*S = nextStatus
+	mu.Unlock()
 
 	return nil
 }

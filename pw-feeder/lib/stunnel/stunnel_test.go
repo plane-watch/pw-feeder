@@ -223,6 +223,17 @@ func TestVerifyPeerCertificatesUsesPresentedIntermediates(t *testing.T) {
 
 }
 
+// TestGetSystemCertPoolCached verifies that verified connections share roots.
+func TestGetSystemCertPoolCached(t *testing.T) {
+	first, err := getSystemCertPool()
+	require.NoError(t, err)
+
+	second, err := getSystemCertPool()
+	require.NoError(t, err)
+
+	assert.Same(t, first, second)
+}
+
 // TestStunnel verifies a successful bidirectional TLS connection.
 func TestStunnel(t *testing.T) {
 
