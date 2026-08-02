@@ -1,42 +1,69 @@
+# Copyright (C) 2024 Plane Watch
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# This file is part of pw-feeder.
+#
+# pw-feeder is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# pw-feeder is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with pw-feeder. If not, see <https://www.gnu.org/licenses/>.
+
 ---
 name: Upload Release Asset
 
-on:
+"on":
   workflow_dispatch:
   release:
     types: [published]
 
 jobs:
 
-
   upload_linux:
     name: Linux Binaries
     strategy:
       matrix:
         os: [linux]
-        arch: [386,amd64,arm,arm64]
+        arch: [386, amd64, arm, arm64]
     runs-on: ubuntu-latest
+    env:
+      RELEASE_NAME: pw-feeder.${{ github.ref_name }}
+      RELEASE_PLATFORM: ${{ matrix.os }}.${{ matrix.arch }}
+      RELEASE_DIR: release-${{ matrix.os }}-${{ matrix.arch }}
     steps:
-    - uses: actions/checkout@v7
-    - uses: actions/setup-go@v7
-      with:
-        go-version: '>=1.25.0'
-    - name: "go mod tidy"
-      run: |
-        cd pw-feeder
-        go mod tidy
-    - name: "go generate"
-      run: |
-        cd pw-feeder
-        go generate ./...
-    - name: "go build"
-      run: |
-        cd pw-feeder
-        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build ./cmd/pw-feeder
-        tar cJvf ../pw-feeder.${{ github.ref_name }}.${{ matrix.os }}.${{ matrix.arch }}.tar.xz ./pw-feeder
-        rm -v ./pw-feeder
-    - name: Upload binaries to release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        gh release upload ${{ github.ref_name }} ./pw-feeder.${{ github.ref_name }}.${{ matrix.os }}.${{ matrix.arch }}.tar.xz
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '>=1.25.0'
+      - name: "go mod tidy"
+        run: |
+          cd pw-feeder
+          go mod tidy
+      - name: "go generate"
+        run: |
+          cd pw-feeder
+          go generate ./...
+      - name: "go build"
+        run: |
+          mkdir -p "${RELEASE_DIR}"
+          cd pw-feeder
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -o "../${RELEASE_DIR}/pw-feeder" ./cmd/pw-feeder
+          cd ..
+          cp LICENSE.md "${RELEASE_DIR}/LICENSE.md"
+          tar cJvf "${RELEASE_NAME}.${RELEASE_PLATFORM}.tar.xz" \
+            -C "${RELEASE_DIR}" \
+            pw-feeder LICENSE.md
+      - name: Upload binaries to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            "./${RELEASE_NAME}.${RELEASE_PLATFORM}.tar.xz"
