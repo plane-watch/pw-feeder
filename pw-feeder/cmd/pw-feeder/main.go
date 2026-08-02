@@ -151,9 +151,7 @@ var (
 			}
 
 			// Ensure secrets are redacted.
-			redactList := map[string]string{
-				command.String("apikey"): "[API_KEY_REDACTED]",
-			}
+			redactList = make(map[string]string)
 			logConfig.FormatPrepare = redactFromLogs(redactList)
 
 			// Set the global logger.
@@ -161,6 +159,9 @@ var (
 			return ctx, nil
 		},
 	}
+
+	// redactList contains a list of strings to redact from logs
+	redactList map[string]string
 )
 
 // commithash returns the VCS revision embedded in the binary's build metadata.
@@ -203,6 +204,7 @@ func main() {
 // runFeeder starts the feeder services and shuts them down on SIGTERM.
 func runFeeder(ctx context.Context, command *cli.Command) error {
 	var err error
+	redactList[command.String("apikey")] = "[API_KEY_REDACTED]"
 
 	// Log startup information.
 	log.Info().
