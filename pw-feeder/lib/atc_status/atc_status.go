@@ -150,7 +150,7 @@ func Start(
 			Namespace:   "plane.watch",
 			Subsystem:   "ATC Status",
 			Name:        "ADSB Healthy",
-			Help:        "1 if BEAST feeding is successful, 0 if not.",
+			Help:        "Beast feeding status from plane watch ATC: 1 if BEAST feeding is successful, 0 if not",
 			Unit:        "",
 			ConstLabels: nil,
 		}, func() float64 {
@@ -171,7 +171,7 @@ func Start(
 			Namespace:   "plane.watch",
 			Subsystem:   "ATC Status",
 			Name:        "MLAT Healthy",
-			Help:        "1 if MLAT feeding is successful, 0 if not.",
+			Help:        "MLAT feeding status from plane watch ATC: 1 if MLAT feeding is successful, 0 if not",
 			Unit:        "",
 			ConstLabels: nil,
 		}, func() float64 {
