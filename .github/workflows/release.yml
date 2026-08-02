@@ -34,9 +34,11 @@ jobs:
         arch: [386, amd64, arm, arm64]
     runs-on: ubuntu-latest
     env:
+      GO_LICENSES_VERSION: v2.0.1
       RELEASE_NAME: pw-feeder.${{ github.ref_name }}
       RELEASE_PLATFORM: ${{ matrix.os }}.${{ matrix.arch }}
       RELEASE_DIR: release-${{ matrix.os }}-${{ matrix.arch }}
+      TOOLS_DIR: ${{ github.workspace }}/.tools
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -50,17 +52,35 @@ jobs:
         run: |
           cd pw-feeder
           go generate ./...
-      - name: "go build"
+      - name: Install licence collector
+        run: |
+          mkdir -p "${TOOLS_DIR}"
+          GOBIN="${TOOLS_DIR}" go install \
+            "github.com/google/go-licenses/v2@${GO_LICENSES_VERSION}"
+      - name: Build and package release
         run: |
           mkdir -p "${RELEASE_DIR}"
           cd pw-feeder
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
             go build -o "../${RELEASE_DIR}/pw-feeder" ./cmd/pw-feeder
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            "${TOOLS_DIR}/go-licenses" save ./cmd/pw-feeder \
+            --ignore pw-feeder \
+            --save_path="../${RELEASE_DIR}/THIRD_PARTY_LICENSES"
+
+          go_root=$(go env GOROOT)
+          go version -m "../${RELEASE_DIR}/pw-feeder" \
+            > "../${RELEASE_DIR}/THIRD_PARTY_LICENSES/DEPENDENCIES.txt"
+          mkdir -p "../${RELEASE_DIR}/THIRD_PARTY_LICENSES/go.dev"
+          cp "${go_root}/LICENSE" \
+            "../${RELEASE_DIR}/THIRD_PARTY_LICENSES/go.dev/LICENSE"
+          cp "${go_root}/PATENTS" \
+            "../${RELEASE_DIR}/THIRD_PARTY_LICENSES/go.dev/PATENTS"
           cd ..
           cp LICENSE.md "${RELEASE_DIR}/LICENSE.md"
           tar cJvf "${RELEASE_NAME}.${RELEASE_PLATFORM}.tar.xz" \
             -C "${RELEASE_DIR}" \
-            pw-feeder LICENSE.md
+            pw-feeder LICENSE.md THIRD_PARTY_LICENSES
       - name: Upload binaries to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

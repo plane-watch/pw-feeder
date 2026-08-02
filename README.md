@@ -170,3 +170,5 @@ Copyright (C) 2024 Plane Watch
 `pw-feeder` is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 `pw-feeder` is distributed in the hope that it will be useful, but **without any warranty**; without even the implied warranty of **merchantability** or **fitness for a particular purpose**. See the [GNU General Public License](LICENSE.md) for more details.
+
+Binary release archives also include a `THIRD_PARTY_LICENSES` directory containing a versioned dependency manifest and the licence and attribution notices for the Go standard library and dependencies linked into the binary.
