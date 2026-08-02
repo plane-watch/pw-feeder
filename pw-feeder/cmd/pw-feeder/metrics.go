@@ -93,7 +93,7 @@ func (service *metricsService) Start() error {
 		}
 	}()
 
-	log.Info().Msgf("Metrics available at http://%s/metrics", listener.Addr())
+	log.Info().Msgf("metrics available at http://%s/metrics", listener.Addr())
 	return nil
 }
 
