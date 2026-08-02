@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -308,18 +309,16 @@ func configFromCommand(command *cli.Command) feederConfig {
 		version: command.Version,
 		apiKey:  command.String(flagAPIKey),
 
-		beastSource: fmt.Sprintf(
-			"%s:%d",
+		beastSource: net.JoinHostPort(
 			command.String(flagBeastHost),
-			command.Uint(flagBeastPort),
+			strconv.FormatUint(uint64(command.Uint(flagBeastPort)), 10),
 		),
 		beastEndpoint: command.String(flagBeastOut),
 
 		mlatEnabled: !command.Bool(flagNoMLAT),
-		mlatListen: fmt.Sprintf(
-			"%s:%d",
+		mlatListen: net.JoinHostPort(
 			command.String(flagMLATServerHost),
-			command.Uint(flagMLATServerPort),
+			strconv.FormatUint(uint64(command.Uint(flagMLATServerPort)), 10),
 		),
 		mlatEndpoint: command.String(flagMLATOut),
 
@@ -330,7 +329,7 @@ func configFromCommand(command *cli.Command) feederConfig {
 		metricsEnabled: !command.Bool(flagNoMetrics),
 		metricsAddress: net.JoinHostPort(
 			command.String(flagMetricsHost),
-			command.String(flagMetricsPort),
+			strconv.FormatUint(uint64(command.Uint(flagMetricsPort)), 10),
 		),
 	}
 }
