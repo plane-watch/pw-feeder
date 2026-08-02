@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"pw-feeder/lib/atc_status"
@@ -15,6 +17,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v3"
@@ -128,6 +133,26 @@ var (
 				Usage:    "Disable color output in log",
 				Sources:  cli.EnvVars("NOCOLOR", "NOCOLOUR"),
 			},
+			&cli.StringFlag{
+				Name:     "metricshost",
+				Category: "Metrics:",
+				Usage:    "Listen host for metrics",
+				Value:    "127.0.0.1",
+				Sources:  cli.EnvVars("METRICSHOST"),
+			},
+			&cli.UintFlag{
+				Name:     "metricsport",
+				Category: "Metrics:",
+				Usage:    "Listen port for metrics",
+				Value:    2112,
+				Sources:  cli.EnvVars("METRICSPORT"),
+			},
+			&cli.BoolFlag{
+				Name:     "nometrics",
+				Category: "Metrics:",
+				Usage:    "Disable metrics",
+				Sources:  cli.EnvVars("NOMETRICS"),
+			},
 		},
 		Action: runFeeder,
 		Before: func(ctx context.Context, command *cli.Command) (context.Context, error) {
@@ -203,7 +228,14 @@ func main() {
 
 // runFeeder starts the feeder services and shuts them down on SIGTERM.
 func runFeeder(ctx context.Context, command *cli.Command) error {
-	var err error
+	var (
+		err           error
+		reg           *prometheus.Registry
+		metricsServer *http.Server
+	)
+	reg = nil
+	metricsErr := make(chan error, 1)
+
 	redactList[command.String("apikey")] = "[API_KEY_REDACTED]"
 
 	// Log startup information.
@@ -214,9 +246,41 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 
 	// Set up a cancellable context.
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// Track the feeder goroutines for a graceful shutdown.
 	wg := sync.WaitGroup{}
+
+	// Create prometheus registry & listener
+	if !command.Bool("nometrics") {
+
+		reg = prometheus.NewRegistry()
+		if command.Bool("debug") {
+			err = reg.Register(collectors.NewGoCollector())
+			if err != nil {
+				return fmt.Errorf("could not register metrics collector: %w", err)
+			}
+			err = reg.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+			if err != nil {
+				return fmt.Errorf("could not register process collector: %w", err)
+			}
+		}
+
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+
+		metricsAddr := net.JoinHostPort(command.String("metricshost"), command.String("metricsport"))
+
+		metricsServer = &http.Server{
+			Addr:              metricsAddr,
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+			BaseContext: func(net.Listener) context.Context {
+				return ctx
+			},
+		}
+
+	}
 
 	// Prepare the MLAT listener.
 	var listenMLAT net.Listener
@@ -232,8 +296,21 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 	}
 
 	// Prepare the signal handler.
-	sigTermChan := make(chan os.Signal)
+	sigTermChan := make(chan os.Signal, 1)
 	signal.Notify(sigTermChan, syscall.SIGTERM)
+	defer signal.Stop(sigTermChan)
+
+	// Start the metrics listener after all fallible listener setup succeeds.
+	if metricsServer != nil {
+		go func() {
+			err := metricsServer.ListenAndServe()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				metricsErr <- err
+			}
+		}()
+
+		log.Info().Msgf("Metrics available at http://%s/metrics", metricsServer.Addr)
+	}
 
 	// Start the BEAST tunnel.
 	wg.Go(func() {
@@ -244,6 +321,7 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 			command.String("beastout"),
 			command.String("apikey"),
 			command.Bool("insecure"),
+			reg,
 		)
 	})
 
@@ -257,6 +335,7 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 				command.String("mlatout"),
 				command.String("apikey"),
 				command.Bool("insecure"),
+				reg,
 			)
 		})
 	}
@@ -268,19 +347,34 @@ func runFeeder(ctx context.Context, command *cli.Command) error {
 			command.String("atcurl"),
 			command.String("apikey"),
 			300,
+			reg,
 		)
 	})
 
-	// Wait for SIGTERM.
-	_ = <-sigTermChan
-	log.Info().Msg("received SIGTERM, stopping")
-
-	// Cancel the context to stop the feeder goroutines.
+	var runErr error
+	select {
+	case <-sigTermChan:
+		log.Info().Msg("received SIGTERM, stopping")
+	case err := <-metricsErr:
+		runErr = fmt.Errorf("metrics listener failed: %w", err)
+	}
 	cancel()
-	atc_status.Stop() // The context cancellation should already have stopped it.
+
+	// stop metrics server
+	if metricsServer != nil {
+		shutdownCtx, shutdownCancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		err := metricsServer.Shutdown(shutdownCtx)
+		shutdownCancel()
+		if err != nil && runErr == nil {
+			runErr = fmt.Errorf("could not stop metrics listener: %w", err)
+		}
+	}
 
 	// Wait for the feeder goroutines to finish.
 	wg.Wait()
 
-	return nil
+	return runErr
 }

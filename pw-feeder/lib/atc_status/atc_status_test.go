@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -254,7 +255,7 @@ func TestStartStop(t *testing.T) {
 
 		// Start the status loop.
 		wg.Go(func() {
-			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60)
+			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60, nil)
 		})
 
 		// Wait for status logging.
@@ -290,7 +291,7 @@ func TestStartStop(t *testing.T) {
 
 		// Start the status loop.
 		wg.Go(func() {
-			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60)
+			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60, nil)
 		})
 
 		// Wait for status logging.
@@ -308,4 +309,33 @@ func TestStartStop(t *testing.T) {
 		// fmt.Println(testCtx.Err())
 
 	})
+}
+
+// TestStartUnregistersMetrics verifies that status collectors are removed from
+// the supplied registry when the status loop stops.
+func TestStartUnregistersMetrics(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	testCtx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		Start(testCtx, "http://unused", TestFeederAPIKey.String(), 3600, reg)
+	}()
+
+	require.Eventually(t, func() bool {
+		metricFamilies, err := reg.Gather()
+		return err == nil && len(metricFamilies) == 2
+	}, time.Second, 10*time.Millisecond)
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("status loop did not stop after context cancellation")
+	}
+
+	metricFamilies, err := reg.Gather()
+	require.NoError(t, err)
+	assert.Empty(t, metricFamilies)
 }

@@ -8,8 +8,10 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 )
 
@@ -49,6 +51,8 @@ var (
 
 	// ErrResponseNotOK indicates that ATC returned a non-OK HTTP response.
 	ErrResponseNotOK = errors.New("HTTP response code not OK")
+
+	mu sync.RWMutex
 )
 
 // getStatusFromATC retrieves the current feeder status from the ATC API.
@@ -85,6 +89,8 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 	}
 
 	// Decode the JSON response.
+	mu.Lock()
+	defer mu.Unlock()
 	err = json.Unmarshal(body, &S)
 	if err != nil {
 		log.Err(err).Msg("error unmarshalling json from feeder status http response body")
@@ -108,9 +114,60 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 
 // Start periodically retrieves feeder status from ATC and writes it to the
 // application log. The interval is jittered by up to one minute.
-func Start(parentContext context.Context, atcUrl, apiKey string, interval int) {
+func Start(
+	parentContext context.Context,
+	atcUrl, apiKey string,
+	interval int,
+	reg prometheus.Registerer,
+) {
 	ctx, cancelFunc = context.WithCancel(parentContext)
 	S := ATCStatus{}
+
+	if reg != nil {
+		colADSBHealth := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Namespace:   "plane.watch",
+			Subsystem:   "ATC Status",
+			Name:        "ADSB Healthy",
+			Help:        "1 if BEAST feeding is successful, 0 if not.",
+			Unit:        "",
+			ConstLabels: nil,
+		}, func() float64 {
+			mu.RLock()
+			defer mu.RUnlock()
+			if S.Status.ADSB.Connected {
+				return 1
+			} else {
+				return 0
+			}
+		})
+		if err := reg.Register(colADSBHealth); err != nil {
+			log.Err(err).Msg("could not register Prometheus gauge for ADSB health check")
+		} else {
+			defer reg.Unregister(colADSBHealth)
+		}
+		colMLATHealth := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Namespace:   "plane.watch",
+			Subsystem:   "ATC Status",
+			Name:        "MLAT Healthy",
+			Help:        "1 if MLAT feeding is successful, 0 if not.",
+			Unit:        "",
+			ConstLabels: nil,
+		}, func() float64 {
+			mu.RLock()
+			defer mu.RUnlock()
+			if S.Status.MLAT.Connected {
+				return 1
+			} else {
+				return 0
+			}
+		})
+		if err := reg.Register(colMLATHealth); err != nil {
+			log.Err(err).Msg("could not register Prometheus gauge for MLAT health check")
+		} else {
+			defer reg.Unregister(colMLATHealth)
+		}
+	}
+
 	for {
 		select {
 
