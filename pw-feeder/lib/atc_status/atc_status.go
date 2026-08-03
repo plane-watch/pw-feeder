@@ -36,6 +36,11 @@ import (
 const (
 	// maxATCStatusResponseBytes bounds the memory used to decode an ATC response.
 	maxATCStatusResponseBytes = 64 * 1024
+
+	metricsNamespace      = "pwfeeder"
+	atcMetricsSubsystem   = "atc"
+	feedHealthyMetricName = "feed_healthy"
+	feedHealthyMetricHelp = "Whether Plane Watch ATC reports the feeder protocol as connected."
 )
 
 // ATCStatus represents a feeder status response from the ATC API.
@@ -147,12 +152,13 @@ func Start(
 
 	if reg != nil {
 		colADSBHealth := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-			Namespace:   "plane.watch",
-			Subsystem:   "ATC Status",
-			Name:        "ADSB Healthy",
-			Help:        "Beast feeding status from plane watch ATC: 1 if BEAST feeding is successful, 0 if not",
-			Unit:        "",
-			ConstLabels: nil,
+			Namespace: metricsNamespace,
+			Subsystem: atcMetricsSubsystem,
+			Name:      feedHealthyMetricName,
+			Help:      feedHealthyMetricHelp,
+			ConstLabels: prometheus.Labels{
+				"protocol": "adsb",
+			},
 		}, func() float64 {
 			mu.RLock()
 			defer mu.RUnlock()
@@ -168,12 +174,13 @@ func Start(
 			defer reg.Unregister(colADSBHealth)
 		}
 		colMLATHealth := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-			Namespace:   "plane.watch",
-			Subsystem:   "ATC Status",
-			Name:        "MLAT Healthy",
-			Help:        "MLAT feeding status from plane watch ATC: 1 if MLAT feeding is successful, 0 if not",
-			Unit:        "",
-			ConstLabels: nil,
+			Namespace: metricsNamespace,
+			Subsystem: atcMetricsSubsystem,
+			Name:      feedHealthyMetricName,
+			Help:      feedHealthyMetricHelp,
+			ConstLabels: prometheus.Labels{
+				"protocol": "mlat",
+			},
 		}, func() float64 {
 			mu.RLock()
 			defer mu.RUnlock()

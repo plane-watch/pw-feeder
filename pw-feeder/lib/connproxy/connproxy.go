@@ -67,6 +67,11 @@ var (
 const (
 	// dataMoverBufferSize is the reusable buffer size for each tunnel direction.
 	dataMoverBufferSize = 32 * 1024
+
+	metricsNamespace       = "pwfeeder"
+	tunnelMetricsSubsystem = "tunnel"
+	tunnelBytesMetricName  = "bytes_total"
+	tunnelBytesMetricHelp  = "Total number of bytes transferred through feeder tunnels."
 )
 
 // incrementByteCounter atomically adds values to the tunnel byte counters.
@@ -174,6 +179,95 @@ func logStats(ctx context.Context, ts *tunnelStats, proto string, interval time.
 	}
 }
 
+// registerTunnelMetrics exports the tunnel counters as a single metric family
+// whose bounded labels describe the protocol, endpoint, and transfer direction.
+func registerTunnelMetrics(
+	reg prometheus.Registerer,
+	protocol string,
+	ts *tunnelStats,
+	logger zerolog.Logger,
+) func() {
+	if reg == nil {
+		return func() {}
+	}
+
+	type metricSpec struct {
+		endpoint  string
+		direction string
+		value     func() float64
+	}
+
+	metrics := []metricSpec{
+		{
+			endpoint:  "local",
+			direction: "received",
+			value: func() float64 {
+				bytesRxLocal, _, _, _ := ts.readStats()
+				return float64(bytesRxLocal)
+			},
+		},
+		{
+			endpoint:  "local",
+			direction: "sent",
+			value: func() float64 {
+				_, bytesTxLocal, _, _ := ts.readStats()
+				return float64(bytesTxLocal)
+			},
+		},
+		{
+			endpoint:  "remote",
+			direction: "received",
+			value: func() float64 {
+				_, _, bytesRxRemote, _ := ts.readStats()
+				return float64(bytesRxRemote)
+			},
+		},
+		{
+			endpoint:  "remote",
+			direction: "sent",
+			value: func() float64 {
+				_, _, _, bytesTxRemote := ts.readStats()
+				return float64(bytesTxRemote)
+			},
+		},
+	}
+
+	protocol = strings.ToLower(protocol)
+	collectors := make([]prometheus.Collector, 0, len(metrics))
+	for _, metric := range metrics {
+		collector := prometheus.NewCounterFunc(prometheus.CounterOpts{
+			Namespace: metricsNamespace,
+			Subsystem: tunnelMetricsSubsystem,
+			Name:      tunnelBytesMetricName,
+			Help:      tunnelBytesMetricHelp,
+			Unit:      "bytes",
+			ConstLabels: prometheus.Labels{
+				"protocol":  protocol,
+				"endpoint":  metric.endpoint,
+				"direction": metric.direction,
+			},
+		}, metric.value)
+
+		if err := reg.Register(collector); err != nil {
+			logger.Error().
+				Err(err).
+				Str("metric", prometheus.BuildFQName(metricsNamespace, tunnelMetricsSubsystem, tunnelBytesMetricName)).
+				Str("protocol", protocol).
+				Str("endpoint", metric.endpoint).
+				Str("direction", metric.direction).
+				Msg("error registering metric")
+			continue
+		}
+		collectors = append(collectors, collector)
+	}
+
+	return func() {
+		for _, collector := range collectors {
+			reg.Unregister(collector)
+		}
+	}
+}
+
 // ProxyBEASTConnection continuously proxies BEAST data from a local endpoint to
 // plane.watch until the context is cancelled.
 func ProxyBEASTConnection(
@@ -193,91 +287,8 @@ func ProxyBEASTConnection(
 		logStats(ctx, &ts, protoname, logStatsInterval)
 	})
 
-	if reg != nil {
-		// define prometheus stats collectors
-		colBytesRxLocal := prometheus.NewCounterFunc(
-			prometheus.CounterOpts{
-				Namespace:   "plane.watch",
-				Subsystem:   "BEAST",
-				Name:        "bytesRxLocal",
-				Help:        "Byte count for BEAST traffic received from BEASTHOST",
-				Unit:        "b",
-				ConstLabels: nil,
-			},
-			func() float64 {
-				ts.mu.RLock()
-				defer ts.mu.RUnlock()
-				return float64(ts.bytesRxLocal)
-			},
-		)
-		colBytesTxLocal := prometheus.NewCounterFunc(
-			prometheus.CounterOpts{
-				Namespace:   "plane.watch",
-				Subsystem:   "BEAST",
-				Name:        "bytesTxLocal",
-				Help:        "Byte count for BEAST traffic sent to BEASTHOST (0 is expected as BEAST is unidirectional)",
-				Unit:        "b",
-				ConstLabels: nil,
-			},
-			func() float64 {
-				ts.mu.RLock()
-				defer ts.mu.RUnlock()
-				return float64(ts.bytesTxLocal)
-			},
-		)
-		colBytesRxRemote := prometheus.NewCounterFunc(
-			prometheus.CounterOpts{
-				Namespace:   "plane.watch",
-				Subsystem:   "BEAST",
-				Name:        "bytesRxRemote",
-				Help:        "Byte count for BEAST traffic received from plane.watch (0 is expected as BEAST is unidirectional)",
-				Unit:        "b",
-				ConstLabels: nil,
-			},
-			func() float64 {
-				ts.mu.RLock()
-				defer ts.mu.RUnlock()
-				return float64(ts.bytesRxRemote)
-			},
-		)
-		colBytesTxRemote := prometheus.NewCounterFunc(
-			prometheus.CounterOpts{
-				Namespace:   "plane.watch",
-				Subsystem:   "BEAST",
-				Name:        "bytesTxRemote",
-				Help:        "Byte count for BEAST traffic sent to plane.watch",
-				Unit:        "b",
-				ConstLabels: nil,
-			},
-			func() float64 {
-				ts.mu.RLock()
-				defer ts.mu.RUnlock()
-				return float64(ts.bytesTxRemote)
-			},
-		)
-
-		// register prometheus stats collectors
-		err := reg.Register(colBytesRxLocal)
-		if err != nil {
-			logger.Error().Err(err).Str("collector", "bytesRxLocal").Msg("error registering metric")
-		}
-		defer reg.Unregister(colBytesRxLocal)
-		err = reg.Register(colBytesTxLocal)
-		if err != nil {
-			logger.Error().Err(err).Str("collector", "bytesTxLocal").Msg("error registering metric")
-		}
-		defer reg.Unregister(colBytesTxLocal)
-		err = reg.Register(colBytesRxRemote)
-		if err != nil {
-			logger.Error().Err(err).Str("collector", "bytesRxRemote").Msg("error registering metric")
-		}
-		defer reg.Unregister(colBytesRxRemote)
-		err = reg.Register(colBytesTxRemote)
-		if err != nil {
-			logger.Error().Err(err).Str("collector", "bytesTxRemote").Msg("error registering metric")
-		}
-		defer reg.Unregister(colBytesTxRemote)
-	}
+	unregisterMetrics := registerTunnelMetrics(reg, protoname, &ts, logger)
+	defer unregisterMetrics()
 
 	bo := backoff.New(backoff.WithResetAfter(5 * time.Minute))
 	retry := false
@@ -395,91 +406,8 @@ func ProxyMLATConnection(
 		logStats(ctx, &ts, protoname, logStatsInterval)
 	})
 
-	if reg != nil {
-		// define prometheus stats collectors
-		colBytesRxLocal := prometheus.NewCounterFunc(
-			prometheus.CounterOpts{
-				Namespace:   "plane.watch",
-				Subsystem:   "MLAT",
-				Name:        "bytesRxLocal",
-				Help:        "Byte count for MLAT traffic received from mlat-client",
-				Unit:        "b",
-				ConstLabels: nil,
-			},
-			func() float64 {
-				ts.mu.RLock()
-				defer ts.mu.RUnlock()
-				return float64(ts.bytesRxLocal)
-			},
-		)
-		colBytesTxLocal := prometheus.NewCounterFunc(
-			prometheus.CounterOpts{
-				Namespace:   "plane.watch",
-				Subsystem:   "MLAT",
-				Name:        "bytesTxLocal",
-				Help:        "Byte count for MLAT traffic sent to mlat-client",
-				Unit:        "b",
-				ConstLabels: nil,
-			},
-			func() float64 {
-				ts.mu.RLock()
-				defer ts.mu.RUnlock()
-				return float64(ts.bytesTxLocal)
-			},
-		)
-		colBytesRxRemote := prometheus.NewCounterFunc(
-			prometheus.CounterOpts{
-				Namespace:   "plane.watch",
-				Subsystem:   "MLAT",
-				Name:        "bytesRxRemote",
-				Help:        "Byte count for MLAT traffic received from plane.watch",
-				Unit:        "b",
-				ConstLabels: nil,
-			},
-			func() float64 {
-				ts.mu.RLock()
-				defer ts.mu.RUnlock()
-				return float64(ts.bytesRxRemote)
-			},
-		)
-		colBytesTxRemote := prometheus.NewCounterFunc(
-			prometheus.CounterOpts{
-				Namespace:   "plane.watch",
-				Subsystem:   "MLAT",
-				Name:        "bytesTxRemote",
-				Help:        "Byte count for MLAT traffic sent to plane.watch",
-				Unit:        "b",
-				ConstLabels: nil,
-			},
-			func() float64 {
-				ts.mu.RLock()
-				defer ts.mu.RUnlock()
-				return float64(ts.bytesTxRemote)
-			},
-		)
-
-		// register prometheus stats collectors
-		err := reg.Register(colBytesRxLocal)
-		if err != nil {
-			logger.Error().Err(err).Str("collector", "bytesRxLocal").Msg("error registering metric")
-		}
-		defer reg.Unregister(colBytesRxLocal)
-		err = reg.Register(colBytesTxLocal)
-		if err != nil {
-			logger.Error().Err(err).Str("collector", "bytesTxLocal").Msg("error registering metric")
-		}
-		defer reg.Unregister(colBytesTxLocal)
-		err = reg.Register(colBytesRxRemote)
-		if err != nil {
-			logger.Error().Err(err).Str("collector", "bytesRxRemote").Msg("error registering metric")
-		}
-		defer reg.Unregister(colBytesRxRemote)
-		err = reg.Register(colBytesTxRemote)
-		if err != nil {
-			logger.Error().Err(err).Str("collector", "bytesTxRemote").Msg("error registering metric")
-		}
-		defer reg.Unregister(colBytesTxRemote)
-	}
+	unregisterMetrics := registerTunnelMetrics(reg, protoname, &ts, logger)
+	defer unregisterMetrics()
 
 	bo := backoff.New(backoff.WithResetAfter(5 * time.Minute))
 	retry := false

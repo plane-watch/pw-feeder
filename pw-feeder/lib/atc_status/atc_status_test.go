@@ -31,6 +31,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil/promlint"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -362,8 +363,29 @@ func TestStartUnregistersMetrics(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		metricFamilies, err := reg.Gather()
-		return err == nil && len(metricFamilies) == 2
+		return err == nil && len(metricFamilies) == 1 && len(metricFamilies[0].GetMetric()) == 2
 	}, time.Second, 10*time.Millisecond)
+
+	metricFamilies, err := reg.Gather()
+	require.NoError(t, err)
+	require.Len(t, metricFamilies, 1)
+	metricFamily := metricFamilies[0]
+	assert.Equal(t, "pwfeeder_atc_feed_healthy", metricFamily.GetName())
+	assert.Equal(t, "GAUGE", metricFamily.GetType().String())
+	assert.Empty(t, metricFamily.GetUnit())
+
+	protocolValues := make(map[string]float64, 2)
+	for _, metric := range metricFamily.GetMetric() {
+		require.Len(t, metric.GetLabel(), 1)
+		label := metric.GetLabel()[0]
+		assert.Equal(t, "protocol", label.GetName())
+		protocolValues[label.GetValue()] = metric.GetGauge().GetValue()
+	}
+	assert.Equal(t, map[string]float64{"adsb": 0, "mlat": 0}, protocolValues)
+
+	problems, err := promlint.NewWithMetricFamilies(metricFamilies).Lint()
+	require.NoError(t, err)
+	assert.Empty(t, problems)
 
 	cancel()
 	select {
@@ -372,7 +394,7 @@ func TestStartUnregistersMetrics(t *testing.T) {
 		t.Fatal("status loop did not stop after context cancellation")
 	}
 
-	metricFamilies, err := reg.Gather()
+	metricFamilies, err = reg.Gather()
 	require.NoError(t, err)
 	assert.Empty(t, metricFamilies)
 }

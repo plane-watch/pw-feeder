@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil/promlint"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -53,6 +55,51 @@ func TestTunnelStats(t *testing.T) {
 	assert.Equal(t, bytesTxLocal, uint64(2))
 	assert.Equal(t, bytesRxRemote, uint64(3))
 	assert.Equal(t, bytesTxRemote, uint64(4))
+}
+
+// TestRegisterTunnelMetrics verifies the exported metric family, labels, unit,
+// values, naming conventions, and cleanup.
+func TestRegisterTunnelMetrics(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	ts := tunnelStats{}
+	ts.incrementByteCounter(1, 2, 3, 4)
+
+	unregister := registerTunnelMetrics(reg, "BEAST", &ts, zerolog.Nop())
+
+	metricFamilies, err := reg.Gather()
+	require.NoError(t, err)
+	require.Len(t, metricFamilies, 1)
+	metricFamily := metricFamilies[0]
+	assert.Equal(t, "pwfeeder_tunnel_bytes_total", metricFamily.GetName())
+	assert.Equal(t, "COUNTER", metricFamily.GetType().String())
+	assert.Equal(t, "bytes", metricFamily.GetUnit())
+	require.Len(t, metricFamily.GetMetric(), 4)
+
+	metricValues := make(map[string]float64, 4)
+	for _, metric := range metricFamily.GetMetric() {
+		labels := make(map[string]string, 3)
+		for _, label := range metric.GetLabel() {
+			labels[label.GetName()] = label.GetValue()
+		}
+		assert.Equal(t, "beast", labels["protocol"])
+		key := labels["endpoint"] + "/" + labels["direction"]
+		metricValues[key] = metric.GetCounter().GetValue()
+	}
+	assert.Equal(t, map[string]float64{
+		"local/received":  1,
+		"local/sent":      2,
+		"remote/received": 3,
+		"remote/sent":     4,
+	}, metricValues)
+
+	problems, err := promlint.NewWithMetricFamilies(metricFamilies).Lint()
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+
+	unregister()
+	metricFamilies, err = reg.Gather()
+	require.NoError(t, err)
+	assert.Empty(t, metricFamilies)
 }
 
 // TestLogStats verifies that statistics logging stops when its context is cancelled.
