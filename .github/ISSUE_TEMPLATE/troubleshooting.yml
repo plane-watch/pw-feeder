@@ -1,0 +1,135 @@
+---
+name: Troubleshooting request
+description: Report a problem with pw-feeder
+title: "[Troubleshooting]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem.
+
+        If you use the official Plane Watch container, please report container,
+        image, or bundled-service problems in the
+        [docker-plane-watch repository][dpw].
+
+        [dpw]: https://github.com/plane-watch/docker-plane-watch/issues
+
+        Never post your Plane Watch API key. The repository automatically
+        removes UUID-shaped API keys from issue bodies and comments as a safety
+        net, but automatic removal is not instantaneous. If a key is exposed,
+        revoke it and generate a replacement in ATC immediately.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem description
+      description: Tell us what is happening and when it started.
+      placeholder: >-
+        Include the symptoms, relevant timing, and any recent configuration
+        changes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: Tell us what you expected to happen.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment method
+      options:
+        - systemd service
+        - Direct command
+        - Built from source
+        - Third-party package or integration
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Runtime configuration
+      description: |
+        List the options or environment variables that affect this problem, but
+        replace the API key with `[REDACTED]`. Do not paste the complete process
+        environment or command line because either may contain the API key.
+      placeholder: |
+        BEASTHOST=127.0.0.1
+        BEASTPORT=30005
+        NOMLAT=false
+        API_KEY=[REDACTED]
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostic output
+      description: |
+        Run the complete command block below on the pw-feeder host, then paste
+        its output here. Commands that do not apply to your installation may
+        report an error; include that output as well.
+
+        Process command-line arguments and the full environment are deliberately
+        excluded because they may contain the API key. Check the journal output
+        for sensitive data before pasting it.
+
+        ```bash
+        (
+          printf '\n=== pw-feeder version and path ===\n'
+          command -v pw-feeder
+          pw-feeder --version
+
+          printf '\n=== Operating system ===\n'
+          uname -a
+          if test -r /etc/os-release; then
+            cat /etc/os-release
+          fi
+
+          printf '\n=== Related processes ===\n'
+          ps -eo pid,user,comm,etime | awk '
+            NR == 1 || $3 ~ /^(pw-feeder|mlat-client|readsb|dump1090)/
+          '
+
+          printf '\n=== Related TCP sockets ===\n'
+          ss -anpt | awk '
+            NR == 1 || /pw-feeder|mlat-client|readsb|dump1090/
+          '
+
+          printf '\n=== systemd service ===\n'
+          systemctl status pw-feeder --no-pager --full
+
+          printf '\n=== Last 100 service log lines ===\n'
+          printf '%s\n' \
+            'WARNING: Check this output for sensitive data before pasting.'
+          journalctl --unit pw-feeder --no-pager --lines 100
+        ) 2>&1
+        ```
+      placeholder: Paste the complete diagnostic output here.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional information
+      description: >-
+        Add anything else that may help reproduce or diagnose the problem.
+
+  - type: checkboxes
+    id: sensitive-data
+    attributes:
+      label: Sensitive data
+      options:
+        - label: >-
+            I have checked that my API key and precise receiver location are not
+            present in this report.
+          required: true
