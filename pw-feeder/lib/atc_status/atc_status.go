@@ -1,3 +1,21 @@
+// Copyright (C) 2024 Plane Watch
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// This file is part of pw-feeder.
+//
+// pw-feeder is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// pw-feeder is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with pw-feeder. If not, see <https://www.gnu.org/licenses/>.
+
 package atc_status
 
 import (
@@ -8,9 +26,21 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
+)
+
+const (
+	// maxATCStatusResponseBytes bounds the memory used to decode an ATC response.
+	maxATCStatusResponseBytes = 64 * 1024
+
+	metricsNamespace      = "pwfeeder"
+	atcMetricsSubsystem   = "atc"
+	feedHealthyMetricName = "feed_healthy"
+	feedHealthyMetricHelp = "Whether Plane Watch ATC reports the feeder protocol as connected."
 )
 
 // ATCStatus represents a feeder status response from the ATC API.
@@ -49,6 +79,8 @@ var (
 
 	// ErrResponseNotOK indicates that ATC returned a non-OK HTTP response.
 	ErrResponseNotOK = errors.New("HTTP response code not OK")
+
+	mu sync.RWMutex
 )
 
 // getStatusFromATC retrieves the current feeder status from the ATC API.
@@ -77,40 +109,94 @@ func (S *ATCStatus) getStatusFromATC(atcUrl, apiKey string) error {
 		return ErrResponseNotOK
 	}
 
-	// Read the response body.
-	body, err := io.ReadAll(res.Body)
+	// Stream the JSON response into a temporary value.
+	// Limiting the reader avoids retaining both an unbounded response body and its decoded representation.
+	var nextStatus ATCStatus
+	decoder := json.NewDecoder(io.LimitReader(res.Body, maxATCStatusResponseBytes))
+	err = decoder.Decode(&nextStatus)
 	if err != nil {
-		log.Err(err).Msg("error reading feeder status http response body")
-		return err
-	}
-
-	// Decode the JSON response.
-	err = json.Unmarshal(body, &S)
-	if err != nil {
-		log.Err(err).Msg("error unmarshalling json from feeder status http response body")
+		log.Err(err).Msg("error decoding json from feeder status http response body")
 		return err
 	}
 
 	// Set a human-readable status for each protocol.
-	if S.Status.ADSB.Connected {
-		S.Status.ADSB.status = "healthy"
+	if nextStatus.Status.ADSB.Connected {
+		nextStatus.Status.ADSB.status = "healthy"
 	} else {
-		S.Status.ADSB.status = "unhealthy"
+		nextStatus.Status.ADSB.status = "unhealthy"
 	}
-	if S.Status.MLAT.Connected {
-		S.Status.MLAT.status = "healthy"
+	if nextStatus.Status.MLAT.Connected {
+		nextStatus.Status.MLAT.status = "healthy"
 	} else {
-		S.Status.MLAT.status = "unhealthy"
+		nextStatus.Status.MLAT.status = "unhealthy"
 	}
+
+	// Only update the status after decoding succeeds.
+	mu.Lock()
+	*S = nextStatus
+	mu.Unlock()
 
 	return nil
 }
 
 // Start periodically retrieves feeder status from ATC and writes it to the
 // application log. The interval is jittered by up to one minute.
-func Start(parentContext context.Context, atcUrl, apiKey string, interval int) {
+func Start(
+	parentContext context.Context,
+	atcUrl, apiKey string,
+	interval int,
+	reg prometheus.Registerer,
+) {
 	ctx, cancelFunc = context.WithCancel(parentContext)
 	S := ATCStatus{}
+
+	if reg != nil {
+		colADSBHealth := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Namespace: metricsNamespace,
+			Subsystem: atcMetricsSubsystem,
+			Name:      feedHealthyMetricName,
+			Help:      feedHealthyMetricHelp,
+			ConstLabels: prometheus.Labels{
+				"protocol": "adsb",
+			},
+		}, func() float64 {
+			mu.RLock()
+			defer mu.RUnlock()
+			if S.Status.ADSB.Connected {
+				return 1
+			} else {
+				return 0
+			}
+		})
+		if err := reg.Register(colADSBHealth); err != nil {
+			log.Err(err).Msg("could not register Prometheus gauge for ADSB health check")
+		} else {
+			defer reg.Unregister(colADSBHealth)
+		}
+		colMLATHealth := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Namespace: metricsNamespace,
+			Subsystem: atcMetricsSubsystem,
+			Name:      feedHealthyMetricName,
+			Help:      feedHealthyMetricHelp,
+			ConstLabels: prometheus.Labels{
+				"protocol": "mlat",
+			},
+		}, func() float64 {
+			mu.RLock()
+			defer mu.RUnlock()
+			if S.Status.MLAT.Connected {
+				return 1
+			} else {
+				return 0
+			}
+		})
+		if err := reg.Register(colMLATHealth); err != nil {
+			log.Err(err).Msg("could not register Prometheus gauge for MLAT health check")
+		} else {
+			defer reg.Unregister(colMLATHealth)
+		}
+	}
+
 	for {
 		select {
 

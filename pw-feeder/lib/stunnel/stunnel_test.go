@@ -1,3 +1,21 @@
+// Copyright (C) 2024 Plane Watch
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// This file is part of pw-feeder.
+//
+// pw-feeder is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// pw-feeder is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with pw-feeder. If not, see <https://www.gnu.org/licenses/>.
+
 package stunnel
 
 import (
@@ -221,6 +239,17 @@ func TestVerifyPeerCertificatesUsesPresentedIntermediates(t *testing.T) {
 	require.NoError(t, verifyPeerCertificates([]*x509.Certificate{leafCert, intermediateCert}, roots, "localhost"))
 	require.Error(t, verifyPeerCertificates([]*x509.Certificate{leafCert}, roots, "localhost"))
 
+}
+
+// TestGetSystemCertPoolCached verifies that verified connections share roots.
+func TestGetSystemCertPoolCached(t *testing.T) {
+	first, err := getSystemCertPool()
+	require.NoError(t, err)
+
+	second, err := getSystemCertPool()
+	require.NoError(t, err)
+
+	assert.Same(t, first, second)
 }
 
 // TestStunnel verifies a successful bidirectional TLS connection.

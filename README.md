@@ -20,17 +20,22 @@ API_KEY='<your-feeder-api-key>' pw-feeder
 
 ## Runtime Configuration
 
-| Option                       | Environment Variable     | Description                                                          | Default     |
-|------------------------------|--------------------------|----------------------------------------------------------------------|-------------|
-| `--apikey`                   | `API_KEY`                | plane.watch user API Key                                             | *unset*     |
-| `--beasthost`                | `BEASTHOST`              | Host to connect to BEAST data                                        | `127.0.0.1` |
-| `--beastport`                | `BEASTPORT`              | Port to connect to BEAST data                                        | `30005`     |
-| `--mlatserverhost`           | `MLATSERVERHOST`         | Listen host for `mlat-client` server connection                      | `127.0.0.1` |
-| `--mlatserverport`           | `MLATSERVERPORT`         | Listen port for `mlat-client` server connection                      | `30105`     |
-| `--debug`                    | `DEBUG`                  | Enable debug logging                                                 | `false`     |
-| `--nocolor`</br>`--nocolour` | `NOCOLOR`</br>`NOCOLOUR` | Disable colour in logs                                               | `false`     |
-| `--nomlat`                   | `NOMLAT`                 | Disable MLAT functionality                                           | `false`     |
-| `--insecure`                 | `INSECURE`               | **Testing only:** disable TLS certificate and server identity verification | `false`     |
+| Option                        | Environment Variable      | Description                                                               | Default     |
+|-------------------------------|---------------------------|---------------------------------------------------------------------------|-------------|
+| `--apikey`                    | `API_KEY`                 | plane.watch feeder API key                                                | *unset*     |
+| `--beasthost`                 | `BEASTHOST`               | Host to connect to for BEAST data                                         | `127.0.0.1` |
+| `--beastport`                 | `BEASTPORT`               | TCP port to connect to for BEAST data                                     | `30005`     |
+| `--mlatserverhost`            | `MLATSERVERHOST`          | Listen host for the `mlat-client` connection                              | `127.0.0.1` |
+| `--mlatserverport`            | `MLATSERVERPORT`          | Listen port for the `mlat-client` connection                              | `12346`     |
+| `--nomlat`                    | `NOMLAT`                  | Disable MLAT functionality                                                | `false`     |
+| `--metricshost`               | `PW_METRICSHOST`          | Listen host for the Prometheus metrics endpoint                           | `127.0.0.1` |
+| `--metricsport`               | `PW_METRICSPORT`          | Listen port for the Prometheus metrics endpoint                           | `2112`      |
+| `--nometrics`                 | `PW_NOMETRICS`            | Disable the Prometheus metrics endpoint                                   | `false`     |
+| `--debug`                     | `DEBUG`                   | Enable debug logging and Go/process metrics                               | `false`     |
+| `--nocolor`<br>`--nocolour`   | `NOCOLOR`<br>`NOCOLOUR`   | Disable colour in logs                                                    | `false`     |
+| `--insecure`                  | `INSECURE`                | **Testing only:** disable TLS certificate and server identity verification | `false`     |
+
+Prometheus metrics are enabled by default at `http://127.0.0.1:2112/metrics`. Use `--metricshost` and `--metricsport` to change the listener, or `--nometrics` to disable it. The endpoint does not require authentication, so bind it only to a trusted interface or network.
 
 > **WARNING**
 > `--insecure` disables verification of the remote server's certificate and identity. Use it only for controlled testing; it makes the TLS connection vulnerable to impersonation and man-in-the-middle attacks.
@@ -46,12 +51,12 @@ Pre-built binaries are available from [GitHub Releases](https://github.com/plane
 | `arm`        | 32-bit ARM, including older Raspberry Pi systems   |
 | `arm64`      | 64-bit ARM (`aarch64`), including newer Raspberry Pi systems |
 
-The current release is `v0.0.10`.
+The current release is `v0.0.11`.
 
-For example, to install `v0.0.10` on a 64-bit Intel or AMD Linux system:
+For example, to install `v0.0.11` on a 64-bit Intel or AMD Linux system:
 
 ```bash
-VERSION=v0.0.10
+VERSION=v0.0.11
 ARCH=amd64
 curl -fLO "https://github.com/plane-watch/pw-feeder/releases/download/${VERSION}/pw-feeder.${VERSION}.linux.${ARCH}.tar.xz"
 tar -xJf "pw-feeder.${VERSION}.linux.${ARCH}.tar.xz"
@@ -157,3 +162,13 @@ sudo apt update
 sudo apt install --reinstall ca-certificates
 sudo update-ca-certificates
 ```
+
+## License
+
+Copyright (C) 2024 Plane Watch
+
+`pw-feeder` is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+`pw-feeder` is distributed in the hope that it will be useful, but **without any warranty**; without even the implied warranty of **merchantability** or **fitness for a particular purpose**. See the [GNU General Public License](LICENSE.md) for more details.
+
+Binary release archives also include a `THIRD_PARTY_LICENSES` directory containing a versioned dependency manifest and the licence and attribution notices for the Go standard library and dependencies linked into the binary.

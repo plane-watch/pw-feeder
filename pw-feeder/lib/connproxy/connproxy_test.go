@@ -1,3 +1,21 @@
+// Copyright (C) 2024 Plane Watch
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// This file is part of pw-feeder.
+//
+// pw-feeder is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// pw-feeder is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with pw-feeder. If not, see <https://www.gnu.org/licenses/>.
+
 package connproxy
 
 import (
@@ -9,6 +27,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil/promlint"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +55,51 @@ func TestTunnelStats(t *testing.T) {
 	assert.Equal(t, bytesTxLocal, uint64(2))
 	assert.Equal(t, bytesRxRemote, uint64(3))
 	assert.Equal(t, bytesTxRemote, uint64(4))
+}
+
+// TestRegisterTunnelMetrics verifies the exported metric family, labels, unit,
+// values, naming conventions, and cleanup.
+func TestRegisterTunnelMetrics(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	ts := tunnelStats{}
+	ts.incrementByteCounter(1, 2, 3, 4)
+
+	unregister := registerTunnelMetrics(reg, "BEAST", &ts, zerolog.Nop())
+
+	metricFamilies, err := reg.Gather()
+	require.NoError(t, err)
+	require.Len(t, metricFamilies, 1)
+	metricFamily := metricFamilies[0]
+	assert.Equal(t, "pwfeeder_tunnel_bytes_total", metricFamily.GetName())
+	assert.Equal(t, "COUNTER", metricFamily.GetType().String())
+	assert.Equal(t, "bytes", metricFamily.GetUnit())
+	require.Len(t, metricFamily.GetMetric(), 4)
+
+	metricValues := make(map[string]float64, 4)
+	for _, metric := range metricFamily.GetMetric() {
+		labels := make(map[string]string, 3)
+		for _, label := range metric.GetLabel() {
+			labels[label.GetName()] = label.GetValue()
+		}
+		assert.Equal(t, "beast", labels["protocol"])
+		key := labels["endpoint"] + "/" + labels["direction"]
+		metricValues[key] = metric.GetCounter().GetValue()
+	}
+	assert.Equal(t, map[string]float64{
+		"local/received":  1,
+		"local/sent":      2,
+		"remote/received": 3,
+		"remote/sent":     4,
+	}, metricValues)
+
+	problems, err := promlint.NewWithMetricFamilies(metricFamilies).Lint()
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+
+	unregister()
+	metricFamilies, err = reg.Gather()
+	require.NoError(t, err)
+	assert.Empty(t, metricFamilies)
 }
 
 // TestLogStats verifies that statistics logging stops when its context is cancelled.
@@ -198,7 +263,8 @@ func TestDataMover(t *testing.T) {
 		waitRead := make(chan bool)
 
 		wg.Go(func() {
-			bytesRead, bytesWritten, err := dataMover(connAOut, connBIn, logger)
+			buf := make([]byte, dataMoverBufferSize)
+			bytesRead, bytesWritten, err := dataMover(connAOut, connBIn, buf, logger)
 			require.NoError(t, err)
 			assert.Equal(t, len(testBytes), bytesRead)
 			assert.Equal(t, len(testBytes), bytesWritten)
@@ -237,7 +303,8 @@ func TestDataMover(t *testing.T) {
 		wg := sync.WaitGroup{}
 
 		wg.Go(func() {
-			_, _, err := dataMover(connAOut, connBIn, logger)
+			buf := make([]byte, dataMoverBufferSize)
+			_, _, err := dataMover(connAOut, connBIn, buf, logger)
 			require.Error(t, err)
 		})
 
@@ -306,7 +373,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 		// Start the proxy.
 		wg := sync.WaitGroup{}
 		wg.Go(func() {
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false, nil)
 		})
 
 		// Wait for a connection attempt.
@@ -353,7 +420,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 
 		// Start the proxy.
 		wg.Go(func() {
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false, nil)
 		})
 
 		// Wait for a connection attempt.
@@ -446,7 +513,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 
 		// Start the proxy.
 		wg.Go(func() {
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false, nil)
 		})
 
 		// Wait for both data transfers.
@@ -514,7 +581,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 
 		// Start the proxy.
 		wg.Go(func() {
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false, nil)
 			t.Log("ProxyOutboundConnection done")
 			finishChan <- true
 			finishChan <- true
@@ -587,7 +654,7 @@ func TestProxyOutboundConnection(t *testing.T) {
 
 		// Start the proxy.
 		wg.Go(func() {
-			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false)
+			ProxyBEASTConnection(ctx, "BEAST", bp.Addr().String(), nl.Addr().String(), TestClientAPIKey.String(), false, nil)
 			t.Log("ProxyOutboundConnection done")
 		})
 
@@ -665,7 +732,7 @@ func TestProxyInboundConnection(t *testing.T) {
 
 		// Start the proxy.
 		wg.Go(func() {
-			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false)
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false, nil)
 		})
 
 		// Wait for connection attempts.
@@ -707,7 +774,7 @@ func TestProxyInboundConnection(t *testing.T) {
 
 		// Start the proxy.
 		wg.Go(func() {
-			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false)
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false, nil)
 		})
 
 		// Start the mock mlat-client.
@@ -783,7 +850,7 @@ func TestProxyInboundConnection(t *testing.T) {
 
 		// Start the proxy.
 		wg.Go(func() {
-			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false)
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false, nil)
 		})
 
 		// Start the mock mlat-client.
@@ -882,7 +949,7 @@ func TestProxyInboundConnection(t *testing.T) {
 
 		// Start the proxy.
 		wg.Go(func() {
-			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false)
+			ProxyMLATConnection(ctx, "MLAT", mp, nl.Addr().String(), TestClientAPIKey.String(), false, nil)
 		})
 
 		// Start the mock mlat-client.

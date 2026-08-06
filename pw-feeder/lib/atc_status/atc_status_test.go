@@ -1,3 +1,21 @@
+// Copyright (C) 2024 Plane Watch
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// This file is part of pw-feeder.
+//
+// pw-feeder is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// pw-feeder is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with pw-feeder. If not, see <https://www.gnu.org/licenses/>.
+
 package atc_status
 
 import (
@@ -12,6 +30,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil/promlint"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +53,8 @@ const (
 	MockServerTestScenarioInvalidJSON
 	// MockServerTestScenarioServerError selects an empty response body.
 	MockServerTestScenarioServerError
+	// MockServerTestScenarioOversizedResponse selects a response over the decode limit.
+	MockServerTestScenarioOversizedResponse
 )
 
 var (
@@ -98,6 +120,8 @@ func PrepMockATCServer(t *testing.T, testScenario int) *httptest.Server {
 				_, _ = w.Write([]byte(resp)[2:])
 			case MockServerTestScenarioServerError:
 				return
+			case MockServerTestScenarioOversizedResponse:
+				_, _ = w.Write([]byte(`{"padding":"` + strings.Repeat("x", maxATCStatusResponseBytes) + `"}`))
 			default:
 				_, _ = w.Write([]byte(resp))
 			}
@@ -178,7 +202,22 @@ func TestGetStatusFromATC(t *testing.T) {
 
 		// Check the result.
 		require.Error(t, err)
-		assert.True(t, strings.Contains(err.Error(), "invalid"))
+		assert.ErrorContains(t, err, "json")
+	})
+
+	t.Run("oversized response", func(t *testing.T) {
+		// Start the test server.
+		testServer := PrepMockATCServer(t, MockServerTestScenarioOversizedResponse)
+		t.Cleanup(func() {
+			testServer.Close()
+		})
+
+		// Retrieve the feeder status.
+		S := ATCStatus{}
+		err := S.getStatusFromATC(testServer.URL, TestFeederAPIKey.String())
+
+		// The response is truncated at the configured limit and cannot be decoded.
+		require.Error(t, err)
 	})
 
 	t.Run("working BEAST", func(t *testing.T) {
@@ -254,7 +293,7 @@ func TestStartStop(t *testing.T) {
 
 		// Start the status loop.
 		wg.Go(func() {
-			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60)
+			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60, nil)
 		})
 
 		// Wait for status logging.
@@ -290,7 +329,7 @@ func TestStartStop(t *testing.T) {
 
 		// Start the status loop.
 		wg.Go(func() {
-			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60)
+			Start(testCtx, testServer.URL, TestFeederAPIKey.String(), 60, nil)
 		})
 
 		// Wait for status logging.
@@ -308,4 +347,54 @@ func TestStartStop(t *testing.T) {
 		// fmt.Println(testCtx.Err())
 
 	})
+}
+
+// TestStartUnregistersMetrics verifies that status collectors are removed from
+// the supplied registry when the status loop stops.
+func TestStartUnregistersMetrics(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	testCtx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		Start(testCtx, "http://unused", TestFeederAPIKey.String(), 3600, reg)
+	}()
+
+	require.Eventually(t, func() bool {
+		metricFamilies, err := reg.Gather()
+		return err == nil && len(metricFamilies) == 1 && len(metricFamilies[0].GetMetric()) == 2
+	}, time.Second, 10*time.Millisecond)
+
+	metricFamilies, err := reg.Gather()
+	require.NoError(t, err)
+	require.Len(t, metricFamilies, 1)
+	metricFamily := metricFamilies[0]
+	assert.Equal(t, "pwfeeder_atc_feed_healthy", metricFamily.GetName())
+	assert.Equal(t, "GAUGE", metricFamily.GetType().String())
+	assert.Empty(t, metricFamily.GetUnit())
+
+	protocolValues := make(map[string]float64, 2)
+	for _, metric := range metricFamily.GetMetric() {
+		require.Len(t, metric.GetLabel(), 1)
+		label := metric.GetLabel()[0]
+		assert.Equal(t, "protocol", label.GetName())
+		protocolValues[label.GetValue()] = metric.GetGauge().GetValue()
+	}
+	assert.Equal(t, map[string]float64{"adsb": 0, "mlat": 0}, protocolValues)
+
+	problems, err := promlint.NewWithMetricFamilies(metricFamilies).Lint()
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("status loop did not stop after context cancellation")
+	}
+
+	metricFamilies, err = reg.Gather()
+	require.NoError(t, err)
+	assert.Empty(t, metricFamilies)
 }

@@ -1,3 +1,21 @@
+// Copyright (C) 2024 Plane Watch
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// This file is part of pw-feeder.
+//
+// pw-feeder is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// pw-feeder is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with pw-feeder. If not, see <https://www.gnu.org/licenses/>.
+
 package stunnel
 
 import (
@@ -5,10 +23,31 @@ import (
 	"crypto/x509"
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
+
+var (
+	// systemCertPoolOnce ensures the system roots are loaded only once.
+	systemCertPoolOnce sync.Once
+
+	// systemCertPool is shared read-only by all verified TLS connections.
+	systemCertPool *x509.CertPool
+
+	// systemCertPoolErr retains any error encountered while loading system roots.
+	systemCertPoolErr error
+)
+
+// getSystemCertPool returns a process-wide, read-only system certificate pool.
+func getSystemCertPool() (*x509.CertPool, error) {
+	systemCertPoolOnce.Do(func() {
+		systemCertPool, systemCertPoolErr = x509.SystemCertPool()
+	})
+
+	return systemCertPool, systemCertPoolErr
+}
 
 // Connect establishes a TLS connection to addr using sni as the server name.
 // Unless insecure mode is enabled, it verifies the certificate for addr's host.
@@ -26,7 +65,7 @@ func Connect(name, addr, sni string, insecure bool) (c *tls.Conn, err error) {
 	// Load the system root certificate authorities.
 	var scp *x509.CertPool
 	if !insecure {
-		scp, err = x509.SystemCertPool()
+		scp, err = getSystemCertPool()
 		if err != nil {
 			// log.Err(err).Caller().Msg("could not use system cert pool")
 			return c, err
