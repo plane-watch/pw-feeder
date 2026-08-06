@@ -53,6 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Test issue sanitization
+        run: tests/sanitize-issue.sh
       - uses: actions/setup-go@v7
         with:
           go-version: '>=1.25.0'
